@@ -18,11 +18,20 @@
 
 1. WebSocket mengirim candle berstatus tutup.
 2. Strategy menghasilkan sinyal dari paling banyak candle itu.
-3. Risk manager mengecek persistent daily loss/drawdown, modal terkelola, dan filter.
-4. Broker mengirim market buy.
-5. Broker segera mengirim OCO sell (take-profit + stop-loss-limit).
-6. Hanya setelah OCO sukses posisi ditulis sebagai `PROTECTED`.
-7. Jika langkah 5 gagal, emergency market sell dijalankan dan runtime melempar error.
+3. Runner membaca saldo USDT (`free` + `locked`) dan menambahkan mark-to-market posisi bot.
+4. Risk manager mengecek persistent daily loss/drawdown, saldo tersedia, dan filter.
+5. Broker mengirim market buy.
+6. Broker segera mengirim OCO sell (take-profit + stop-loss-limit).
+7. Hanya setelah OCO sukses posisi ditulis sebagai `PROTECTED`.
+8. Jika langkah 6 gagal, emergency market sell dijalankan dan runtime melempar error.
+
+## Modal dinamis
+
+Backtest memakai `initial_cash` eksplisit agar eksperimen dapat direproduksi. Paper dan
+live tidak memakai angka itu: keduanya membaca balance akun melalui endpoint account.
+Sizing dihitung dari persentase equity, lalu di-clamp oleh saldo `free`, buffer harga,
+optional notional cap, `maxQty`, dan `maxNotional`. Snapshot equity disimpan ke jurnal dan
+menjadi sumber drawdown paper gate.
 
 ## Restart dan kill-switch
 

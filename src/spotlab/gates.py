@@ -46,16 +46,19 @@ def paper_gate(journal: TradingJournal, config: GatesConfig) -> GateResult:
     losses = abs(sum(value for value in pnl if value < 0))
     profit_factor = wins / losses if losses else (float("inf") if wins else 0.0)
     expectancy = sum(pnl) / len(pnl) if pnl else 0.0
-    equity = 20.0
-    peak = equity
+    snapshots = journal.equity_rows("paper")
+    equity_values = [float(row["equity"]) for row in snapshots]
+    peak = equity_values[0] if equity_values else 0.0
     max_drawdown = 0.0
-    for value in pnl:
-        equity += value
+    for equity in equity_values:
         peak = max(peak, equity)
-        max_drawdown = max(max_drawdown, (peak - equity) / peak * 100)
+        if peak > 0:
+            max_drawdown = max(max_drawdown, (peak - equity) / peak * 100)
     metrics: dict[str, float | int | str] = {
         "runtime_days": runtime_days,
         "closed_trades": len(trades),
+        "starting_equity": equity_values[0] if equity_values else 0.0,
+        "final_equity": equity_values[-1] if equity_values else 0.0,
         "profit_factor": profit_factor,
         "max_drawdown_pct": max_drawdown,
         "expectancy_per_trade": expectancy,
@@ -65,6 +68,8 @@ def paper_gate(journal: TradingJournal, config: GatesConfig) -> GateResult:
         reasons.append(f"Paper runtime {runtime_days:.2f}/{config.paper_min_days} hari")
     if len(trades) < config.paper_min_closed_trades:
         reasons.append(f"Paper trades {len(trades)}/{config.paper_min_closed_trades}")
+    if not equity_values:
+        reasons.append("Snapshot equity paper belum tersedia")
     if profit_factor < config.paper_min_profit_factor:
         reasons.append("Profit factor paper belum memenuhi minimum")
     if max_drawdown > config.paper_max_drawdown_pct:

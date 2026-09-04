@@ -180,6 +180,7 @@ def parse_symbol_rules(info: dict[str, Any], symbol: str) -> SymbolRules:
     notional = filters.get("NOTIONAL") or filters.get("MIN_NOTIONAL")
     if notional is None:
         raise RuntimeError("Exchange tidak mengembalikan filter NOTIONAL/MIN_NOTIONAL")
+    raw_max_notional = Decimal(str(notional.get("maxNotional", "0")))
     return SymbolRules(
         symbol=symbol.upper(),
         min_qty=Decimal(lot["minQty"]),
@@ -187,7 +188,7 @@ def parse_symbol_rules(info: dict[str, Any], symbol: str) -> SymbolRules:
         step_size=Decimal(lot["stepSize"]),
         tick_size=Decimal(price["tickSize"]),
         min_notional=Decimal(notional["minNotional"]),
-        max_notional=(Decimal(notional["maxNotional"]) if notional.get("maxNotional") else None),
+        max_notional=raw_max_notional if raw_max_notional > 0 else None,
     )
 
 

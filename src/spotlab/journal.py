@@ -93,6 +93,19 @@ class TradingJournal:
                     payload TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS equity_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    mode TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    equity REAL NOT NULL,
+                    available_quote REAL NOT NULL,
+                    locked_quote REAL NOT NULL,
+                    position_value REAL NOT NULL,
+                    FOREIGN KEY(session_id) REFERENCES sessions(id)
+                );
+                CREATE INDEX IF NOT EXISTS ix_equity_snapshots_mode_time
+                    ON equity_snapshots(mode, timestamp);
                 """
             )
 
@@ -248,6 +261,41 @@ class TradingJournal:
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM trades WHERE mode=? ORDER BY exit_time", (mode,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def log_equity(
+        self,
+        session_id: int,
+        mode: str,
+        equity: float,
+        available_quote: float,
+        locked_quote: float,
+        position_value: float,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO equity_snapshots(
+                    session_id, mode, timestamp, equity, available_quote,
+                    locked_quote, position_value
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    mode,
+                    datetime.now(UTC).isoformat(),
+                    equity,
+                    available_quote,
+                    locked_quote,
+                    position_value,
+                ),
+            )
+
+    def equity_rows(self, mode: str) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM equity_snapshots WHERE mode=? ORDER BY timestamp, id", (mode,)
             ).fetchall()
         return [dict(row) for row in rows]
 

@@ -59,9 +59,10 @@ class BacktestConfig(StrictModel):
 
 
 class RiskConfig(StrictModel):
-    managed_capital_usdt: float = Field(20.0, gt=0)
     risk_per_trade_pct: float = Field(1.0, gt=0, le=5)
     max_allocation_pct: float = Field(50.0, gt=0, le=100)
+    max_position_notional_usdt: float | None = Field(default=None, gt=0)
+    market_order_buffer_pct: float = Field(0.5, ge=0, le=5)
     stop_loss_pct: float = Field(3.0, gt=0, le=20)
     take_profit_pct: float = Field(6.0, gt=0, le=100)
     daily_loss_limit_pct: float = Field(3.0, gt=0, le=20)

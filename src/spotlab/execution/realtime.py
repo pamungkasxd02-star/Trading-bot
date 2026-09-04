@@ -11,7 +11,7 @@ import pandas as pd
 from spotlab.config import AppConfig
 from spotlab.data import MarketDataStore
 from spotlab.exchange import stream_closed_klines
-from spotlab.execution.broker import BinanceBroker, ExitExecution, ManagedPosition
+from spotlab.execution.broker import AssetBalance, BinanceBroker, ExitExecution, ManagedPosition
 from spotlab.journal import TradingJournal
 from spotlab.notifier import TelegramNotifier
 from spotlab.risk import RiskManager, RiskViolation
@@ -46,12 +46,26 @@ class RealtimeRunner:
     def request_stop(self) -> None:
         self.stop_event.set()
 
-    def _managed_equity(self, mark_price: float | None = None) -> float:
-        closed_pnl = sum(float(row["net_pnl"]) for row in self.journal.trade_rows(self.mode))
-        equity = self.config.risk.managed_capital_usdt + closed_pnl
-        if self.position is not None and mark_price is not None:
-            equity += (mark_price - self.position.entry_price) * self.position.quantity
-        return equity
+    async def _account_capital(self, mark_price: float) -> tuple[AssetBalance, float, float]:
+        balance = await asyncio.to_thread(self.broker.asset_balance, "USDT")
+        position_value = self.position.quantity * mark_price if self.position is not None else 0.0
+        return balance, balance.total + position_value, position_value
+
+    def _record_equity(
+        self,
+        session_id: int,
+        balance: AssetBalance,
+        equity: float,
+        position_value: float,
+    ) -> None:
+        self.journal.log_equity(
+            session_id,
+            self.mode,
+            equity,
+            balance.free,
+            balance.locked,
+            position_value,
+        )
 
     def _record_exit(self, session_id: int, execution: ExitExecution) -> None:
         assert self.position is not None
@@ -106,7 +120,7 @@ class RealtimeRunner:
     async def run(self) -> None:
         if self.config.runtime.kill_switch_file.exists():
             raise RuntimeError("Kill-switch aktif; jalankan `spotlab clear-kill` setelah diperiksa")
-        self.broker.validate_account()
+        await asyncio.to_thread(self.broker.validate_account)
         session_id = self.journal.start_session(
             self.mode, self.config.runtime.session_stale_seconds
         )
@@ -136,6 +150,20 @@ class RealtimeRunner:
         history = self.store.load_candles(symbol, self.config.exchange.interval).tail(400)
         if len(history) < max(self.config.strategy.sma_trend, self.config.strategy.ema_slow) + 5:
             raise RuntimeError("Cache candle belum cukup; jalankan `spotlab fetch` dahulu")
+
+        latest_mark = float(history.iloc[-1]["close"])
+        if self.position is not None:
+            execution = await asyncio.to_thread(self.broker.poll_exit, self.position)
+            if execution is not None:
+                self._record_exit(session_id, execution)
+        balance, equity, position_value = await self._account_capital(latest_mark)
+        if equity <= 0:
+            raise RuntimeError("Saldo USDT akun dan nilai posisi bot harus lebih besar dari nol")
+        self._record_equity(session_id, balance, equity, position_value)
+        state = self.journal.get_or_reset_risk_state(self.mode, equity)
+        RiskManager(self.config.risk, self.store.load_symbol_rules(symbol)).assert_loss_limits(
+            equity, float(state["day_start_equity"]), float(state["peak_equity"])
+        )
 
         async for candle in stream_closed_klines(
             symbol,
@@ -180,6 +208,7 @@ class RealtimeRunner:
                 )
                 self._record_exit(session_id, execution)
             elif self.position is None and action == "enter_long":
+                balance, equity, _ = await self._account_capital(float(latest["close"]))
                 await self._enter(
                     session_id,
                     symbol,
@@ -187,9 +216,12 @@ class RealtimeRunner:
                     float(latest["close"]),
                     str(latest["close_time"]),
                     str(latest["signal_reason"]),
+                    equity,
+                    balance.free,
                 )
 
-            equity = self._managed_equity(float(latest["close"]))
+            balance, equity, position_value = await self._account_capital(float(latest["close"]))
+            self._record_equity(session_id, balance, equity, position_value)
             state = self.journal.get_or_reset_risk_state(self.mode, equity)
             RiskManager(self.config.risk, self.store.load_symbol_rules(symbol)).assert_loss_limits(
                 equity, float(state["day_start_equity"]), float(state["peak_equity"])
@@ -203,10 +235,11 @@ class RealtimeRunner:
         mark_price: float,
         entry_time: str,
         reason: str,
+        equity: float,
+        available_quote: float,
     ) -> None:
         rules = self.store.load_symbol_rules(symbol)
         manager = RiskManager(self.config.risk, rules)
-        equity = self._managed_equity(mark_price)
         state = self.journal.get_or_reset_risk_state(self.mode, equity)
         manager.assert_loss_limits(
             equity,
@@ -214,7 +247,7 @@ class RealtimeRunner:
             float(state["peak_equity"]),
         )
         try:
-            sized = manager.size_long(equity, mark_price)
+            sized = manager.size_long(equity, mark_price, available_quote)
         except RiskViolation as error:
             LOGGER.info("Entry dilewati: %s", error)
             return

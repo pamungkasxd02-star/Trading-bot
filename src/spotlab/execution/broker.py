@@ -10,6 +10,17 @@ from spotlab.risk import decimal_string, floor_to_step, floor_to_tick
 
 
 @dataclass(frozen=True, slots=True)
+class AssetBalance:
+    asset: str
+    free: float
+    locked: float
+
+    @property
+    def total(self) -> float:
+        return self.free + self.locked
+
+
+@dataclass(frozen=True, slots=True)
 class ManagedPosition:
     symbol: str
     entry_time: str
@@ -64,6 +75,18 @@ class BinanceBroker:
         account = self.client.account()
         if not account.get("canTrade", False):
             raise RuntimeError("API key tidak memiliki izin trading")
+
+    def asset_balance(self, asset: str) -> AssetBalance:
+        target = asset.upper()
+        account = self.client.account()
+        for balance in account.get("balances", []):
+            if str(balance.get("asset", "")).upper() == target:
+                return AssetBalance(
+                    asset=target,
+                    free=float(balance.get("free", 0)),
+                    locked=float(balance.get("locked", 0)),
+                )
+        return AssetBalance(asset=target, free=0.0, locked=0.0)
 
     def _quote_fee(self, order: dict[str, Any], base_asset: str) -> tuple[float, Decimal]:
         estimated = float(order.get("cummulativeQuoteQty", 0)) * self.fee_rate

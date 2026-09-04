@@ -31,9 +31,11 @@ backtest:
   slippage_bps: 5.0
 
 risk:
-  managed_capital_usdt: 20.0
   risk_per_trade_pct: 1.0
   max_allocation_pct: 50.0
+  # null = tidak ada hard cap; sizing mengikuti saldo USDT akun secara dinamis.
+  max_position_notional_usdt: null
+  market_order_buffer_pct: 0.5
   stop_loss_pct: 2.5
   take_profit_pct: 5.0
   daily_loss_limit_pct: 3.0

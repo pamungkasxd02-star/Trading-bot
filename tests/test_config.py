@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from spotlab.cli import parser
 from spotlab.config import AppConfig, StrategyConfig, load_config
 
 
@@ -29,3 +30,9 @@ def test_live_defaults_are_safely_testnet() -> None:
     config = AppConfig()
     assert config.exchange.testnet is True
     assert config.risk.max_open_positions == 1
+    assert config.risk.max_position_notional_usdt is None
+
+
+def test_backtest_capital_can_be_overridden_from_cli() -> None:
+    args = parser().parse_args(["backtest", "--initial-cash", "10000"])
+    assert args.initial_cash == 10_000.0

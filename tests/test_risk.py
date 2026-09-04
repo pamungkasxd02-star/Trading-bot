@@ -40,3 +40,26 @@ def test_daily_loss_and_drawdown_halt() -> None:
     manager = RiskManager(RiskConfig(), rules())
     with pytest.raises(RiskViolation, match="Daily loss"):
         manager.assert_loss_limits(19.3, 20.0, 20.0)
+
+
+def test_zero_equity_state_halts_cleanly() -> None:
+    manager = RiskManager(RiskConfig(), rules())
+    with pytest.raises(RiskViolation, match="lebih besar dari nol"):
+        manager.assert_loss_limits(0.0, 0.0, 0.0)
+
+
+def test_large_account_is_clamped_to_exchange_maximum() -> None:
+    sized = RiskManager(RiskConfig(), rules()).size_long(1_000_000_000.0, 50_000.0)
+    assert sized.notional == Decimal("9000000.00000")
+    assert sized.quantity == Decimal("180.00000")
+
+
+def test_available_balance_and_market_buffer_cap_order() -> None:
+    config = RiskConfig(market_order_buffer_pct=0.5)
+    sized = RiskManager(config, rules()).size_long(
+        equity=10_000.0,
+        entry_price=50_000.0,
+        available_quote=1_000.0,
+    )
+    assert sized.notional <= Decimal("995")
+    assert sized.notional > Decimal("990")

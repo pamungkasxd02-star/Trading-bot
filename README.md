@@ -1,4 +1,4 @@
-# Binance Spot Lab — modal terkelola 20 USDT
+# Binance Spot Lab — modal dinamis (baseline 20 USDT)
 
 Bot riset trading **Binance Spot, long-only, tanpa leverage/futures**. Urutan yang dipaksa
 oleh aplikasi adalah: data → backtest → validasi rolling-window → Binance Spot Testnet
@@ -26,8 +26,10 @@ adalah sumber status gate yang sebenarnya.
 
 ## Prinsip keselamatan
 
-- Modal yang dikelola dibatasi 20 USDT plus PnL bot; saldo akun lain tidak ikut dihitung.
-- Maksimal satu posisi, risk budget 1% dan alokasi maksimal 50% per posisi.
+- Paper/live membaca saldo USDT akun secara dinamis; tidak ada hard cap 20 USDT.
+- Maksimal satu posisi, risk budget 1% dan alokasi maksimal 50% dari equity akun.
+- Quantity juga dibatasi saldo `free`, buffer market order, `LOT_SIZE`, dan `NOTIONAL`
+  Binance. Akun besar otomatis diskalakan atau dipotong ke batas exchange.
 - Setiap buy langsung diikuti OCO stop-loss 2,5% dan take-profit 5% di exchange. Jika OCO
   gagal, posisi segera dijual market dan runtime berhenti.
 - Daily loss limit 3%, max drawdown 10%, state risiko persisten antar-restart.
@@ -95,7 +97,12 @@ berikutnya membaca cache lokal.
 
 ```bash
 spotlab backtest --months 24 --output reports/my-run
+# Uji nominal lain tanpa mengubah config:
+spotlab backtest --months 24 --initial-cash 10000 --output reports/10k
 ```
+
+Nilai `backtest.initial_cash: 20` hanya preset untuk mereproduksi baseline. Ia dapat diganti
+di YAML atau lewat `--initial-cash`; angka tersebut tidak membatasi paper/live.
 
 Asumsi konservatif baseline:
 
@@ -111,7 +118,8 @@ Output: `summary.json`, `summary.csv`, `trades.csv`, `equity.csv`, dan
 ## 3. Validasi rolling-window
 
 ```bash
-spotlab validate --months 24 --window-months 3 --output reports/validation
+spotlab validate --months 24 --initial-cash 10000 --window-months 3 \
+  --output reports/validation-10k
 ```
 
 Research pass memerlukan profit factor ≥1,05, expectancy positif, max drawdown ≤10%, dan
@@ -127,8 +135,16 @@ spotlab paper
 ```
 
 Biarkan berjalan minimal 14 hari **runtime aktif**. Waktu offline atau heartbeat basi
-tidak dihitung. Semua signal, order, session, posisi, dan trade disimpan di
-`data/runtime.db`; proses kedua untuk mode yang sama ditolak.
+tidak dihitung. Semua signal, order, session, posisi, trade, dan snapshot equity akun
+disimpan di `data/runtime.db`; proses kedua untuk mode yang sama ditolak.
+
+Testnet sering memiliki saldo virtual yang jauh lebih besar dari 20 USDT. Secara default
+bot akan menyesuaikan sizing terhadap saldo itu. Untuk membatasi nominal demo secara
+opsional, isi `risk.max_position_notional_usdt`; biarkan `null` agar tanpa hard cap.
+
+Gunakan akun/sub-account khusus bot dan hindari order manual bersamaan. Deposit,
+withdrawal, atau order lain yang mengunci USDT akan ikut mengubah equity akun dan dapat
+memengaruhi perhitungan daily loss/drawdown.
 
 ```bash
 spotlab readiness

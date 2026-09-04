@@ -66,3 +66,14 @@ def test_runtime_counts_heartbeat_not_wall_clock(tmp_path) -> None:
             (long_ago, heartbeat, session),
         )
     assert journal.paper_runtime_seconds() < 3700
+
+
+def test_paper_drawdown_uses_recorded_account_equity(tmp_path) -> None:
+    journal = TradingJournal(tmp_path / "runtime.db")
+    session = journal.start_session("paper")
+    journal.log_equity(session, "paper", 1_000.0, 1_000.0, 0.0, 0.0)
+    journal.log_equity(session, "paper", 900.0, 700.0, 0.0, 200.0)
+    result = paper_gate(journal, GatesConfig())
+    assert result.metrics["starting_equity"] == 1_000.0
+    assert result.metrics["final_equity"] == 900.0
+    assert result.metrics["max_drawdown_pct"] == 10.0

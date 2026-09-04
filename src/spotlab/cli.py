@@ -38,10 +38,12 @@ def parser() -> argparse.ArgumentParser:
 
     backtest = commands.add_parser("backtest", help="Backtest dari cache lokal")
     backtest.add_argument("--months", type=int)
+    backtest.add_argument("--initial-cash", type=float)
     backtest.add_argument("--output", default="reports/latest")
 
     validate = commands.add_parser("validate", help="Backtest penuh + rolling windows")
     validate.add_argument("--months", type=int)
+    validate.add_argument("--initial-cash", type=float)
     validate.add_argument("--window-months", type=int, default=3)
     validate.add_argument("--output", default="reports/validation")
 
@@ -156,16 +158,29 @@ def _dispatch(args: argparse.Namespace) -> None:
         if candles.empty:
             raise RuntimeError("Cache kosong; jalankan `spotlab fetch` dahulu")
         rules = store.load_symbol_rules(symbol)
+        run_config = config
+        if args.initial_cash is not None:
+            if args.initial_cash <= 0:
+                raise ValueError("--initial-cash harus lebih besar dari nol")
+            run_config = config.model_copy(
+                update={
+                    "backtest": config.backtest.model_copy(
+                        update={"initial_cash": args.initial_cash}
+                    )
+                }
+            )
         if args.command == "backtest":
-            result = Backtester(_build(config), config.backtest, config.risk, rules).run(candles)
+            result = Backtester(
+                _build(run_config), run_config.backtest, run_config.risk, rules
+            ).run(candles)
             write_backtest_report(result, args.output)
             print(terminal_summary(result))
             print(f"Report: {Path(args.output).resolve()}")
         else:
             result, summary = validate_rolling_windows(
                 candles,
-                _build(config),
-                config,
+                _build(run_config),
+                run_config,
                 rules,
                 args.output,
                 window_months=args.window_months,

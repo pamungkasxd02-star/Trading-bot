@@ -38,9 +38,16 @@ class RiskManager:
         self.config = config
         self.rules = rules
 
-    def size_long(self, equity: float, entry_price: float) -> SizedOrder:
+    def size_long(
+        self,
+        equity: float,
+        entry_price: float,
+        available_quote: float | None = None,
+    ) -> SizedOrder:
         if equity <= 0 or entry_price <= 0:
             raise RiskViolation("Equity dan harga harus positif")
+        if available_quote is not None and available_quote < 0:
+            raise RiskViolation("Saldo quote tersedia tidak boleh negatif")
         cfg = self.config
         price = Decimal(str(entry_price))
         equity_decimal = Decimal(str(equity))
@@ -48,18 +55,22 @@ class RiskManager:
         risk_per_unit = price * Decimal(str(cfg.stop_loss_pct / 100))
         by_risk = risk_budget / risk_per_unit
         by_allocation = equity_decimal * Decimal(str(cfg.max_allocation_pct / 100)) / price
-        quantity = floor_to_step(min(by_risk, by_allocation), self.rules.step_size)
+        limits = [by_risk, by_allocation, self.rules.max_qty]
+        if self.rules.max_notional is not None:
+            limits.append(self.rules.max_notional / price)
+        if cfg.max_position_notional_usdt is not None:
+            limits.append(Decimal(str(cfg.max_position_notional_usdt)) / price)
+        if available_quote is not None:
+            buffer = Decimal("1") - Decimal(str(cfg.market_order_buffer_pct / 100))
+            limits.append(Decimal(str(available_quote)) * buffer / price)
+        quantity = floor_to_step(min(limits), self.rules.step_size)
         notional = quantity * price
         if quantity < self.rules.min_qty:
             raise RiskViolation("Quantity di bawah LOT_SIZE minimum")
-        if quantity > self.rules.max_qty:
-            raise RiskViolation("Quantity melebihi LOT_SIZE maximum")
         if notional < self.rules.min_notional:
             raise RiskViolation(
                 f"Notional {notional} di bawah minimum exchange {self.rules.min_notional}"
             )
-        if self.rules.max_notional is not None and notional > self.rules.max_notional:
-            raise RiskViolation("Notional melebihi maximum exchange")
         stop = floor_to_tick(
             price * (Decimal("1") - Decimal(str(cfg.stop_loss_pct / 100))),
             self.rules.tick_size,
@@ -76,6 +87,8 @@ class RiskManager:
         day_start_equity: float,
         peak_equity: float,
     ) -> None:
+        if equity <= 0 or day_start_equity <= 0 or peak_equity <= 0:
+            raise RiskViolation("Equity risiko harus lebih besar dari nol")
         daily_loss = (day_start_equity - equity) / day_start_equity * 100
         drawdown = (peak_equity - equity) / peak_equity * 100
         if daily_loss >= self.config.daily_loss_limit_pct:

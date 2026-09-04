@@ -22,9 +22,18 @@ def main() -> None:
     parser.add_argument("--csv", required=True)
     parser.add_argument("--output", default="reports/baseline")
     parser.add_argument("--months", type=int, default=24)
+    parser.add_argument("--initial-cash", type=float)
     args = parser.parse_args()
 
     config = load_config("config/default.yaml")
+    if args.initial_cash is not None:
+        if args.initial_cash <= 0:
+            parser.error("--initial-cash harus lebih besar dari nol")
+        config = config.model_copy(
+            update={
+                "backtest": config.backtest.model_copy(update={"initial_cash": args.initial_cash})
+            }
+        )
     candles = pd.read_csv(args.csv)
     candles["open_time"] = pd.to_datetime(candles.pop("timestamp"), utc=True)
     candles["close_time"] = candles["open_time"] + timedelta(hours=4) - timedelta(milliseconds=1)

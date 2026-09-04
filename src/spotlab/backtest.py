@@ -95,7 +95,7 @@ class Backtester:
             if position is None and bool(previous["enter_long"]):
                 entry_price = float(row["open"]) * (1 + slip_rate)
                 try:
-                    sized = self.risk_manager.size_long(cash, entry_price)
+                    sized = self.risk_manager.size_long(cash, entry_price, cash)
                 except RiskViolation:
                     min_notional_skips += 1
                 else:

@@ -33,3 +33,7 @@ parameter.
 Research gate dan paper gate adalah pemeriksaan minimum, bukan sertifikat aman. Live juga
 memerlukan acknowledgement string, config production terpisah, API key trade-only tanpa
 withdrawal, dan tidak adanya kill-switch.
+
+Paper gate menghitung drawdown dari snapshot equity akun, bukan dari asumsi modal 20 USDT.
+Karena deposit, withdrawal, dan order manual dapat mengubah equity tanpa berasal dari
+strategi, forward test sebaiknya memakai akun atau sub-account khusus bot.

@@ -41,3 +41,27 @@ def test_candle_upsert_is_idempotent(tmp_path) -> None:
     frame = store.load_candles("BTCUSDT", "4h")
     assert len(frame) == 1
     assert frame.iloc[0]["close"] == 11.5
+
+
+def test_zero_max_notional_means_exchange_cap_is_disabled() -> None:
+    payload = {
+        "symbols": [
+            {
+                "filters": [
+                    {"filterType": "PRICE_FILTER", "tickSize": "0.01"},
+                    {
+                        "filterType": "LOT_SIZE",
+                        "minQty": "0.00001",
+                        "maxQty": "9000",
+                        "stepSize": "0.00001",
+                    },
+                    {
+                        "filterType": "NOTIONAL",
+                        "minNotional": "5",
+                        "maxNotional": "0.00000000",
+                    },
+                ]
+            }
+        ]
+    }
+    assert parse_symbol_rules(payload, "BTCUSDT").max_notional is None
