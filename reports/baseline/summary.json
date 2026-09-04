@@ -1,0 +1,14 @@
+{
+  "initial_cash": 20.0,
+  "final_equity": 22.02073378054898,
+  "net_return_pct": 10.1036689027449,
+  "trade_count": 27,
+  "win_rate_pct": 48.148148148148145,
+  "profit_factor": 1.7081120549537723,
+  "max_drawdown_pct": 6.052446851813174,
+  "average_win": 0.37495583733602406,
+  "average_loss": -0.20383515034423833,
+  "expectancy_per_trade": 0.07484199187218427,
+  "total_fees": 0.44604229800104994,
+  "min_notional_skips": 0
+}

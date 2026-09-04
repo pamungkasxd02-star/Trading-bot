@@ -1,0 +1,13 @@
+{
+  "market": "Binance Spot",
+  "symbol": "BTCUSDT",
+  "interval": "4h",
+  "rows_used": 4381,
+  "start_utc": "2024-07-10T08:00:00+00:00",
+  "end_utc": "2026-07-10T08:00:00+00:00",
+  "snapshot_repository": "Ilnyr2006-droid/python-paper-trading-agent-1-data",
+  "snapshot_path": "data/markets/BTCUSDT_4h.csv",
+  "git_blob_sha": "f5c4edf585bcbe76a1e8c17ab06659cd961a587d",
+  "csv_sha256": "b0ed49ee1dc5d83c847b951e73d3f44852f624b587afb23f8a6d0ea0af1fe98a",
+  "raw_dataset_committed": false
+}

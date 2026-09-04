@@ -1,0 +1,57 @@
+exchange:
+  symbol: BTCUSDT
+  interval: 4h
+  testnet: true
+  recv_window_ms: 5000
+  rest_timeout_seconds: 15
+
+data:
+  database: data/spotlab.db
+  history_months: 24
+
+strategy:
+  name: rule_based_v1
+  ema_fast: 20
+  ema_slow: 56
+  sma_trend: 100
+  rsi_period: 14
+  rsi_min: 44.0
+  rsi_max: 70.0
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  bb_period: 20
+  bb_std: 2.0
+  volume_period: 20
+  min_confirmations: 3
+
+backtest:
+  initial_cash: 20.0
+  fee_bps: 10.0
+  slippage_bps: 5.0
+
+risk:
+  managed_capital_usdt: 20.0
+  risk_per_trade_pct: 1.0
+  max_allocation_pct: 50.0
+  stop_loss_pct: 2.5
+  take_profit_pct: 5.0
+  daily_loss_limit_pct: 3.0
+  max_drawdown_pct: 10.0
+  max_open_positions: 1
+
+gates:
+  research_min_profit_factor: 1.05
+  research_max_drawdown_pct: 10.0
+  research_min_positive_windows_ratio: 0.75
+  paper_min_days: 14
+  paper_min_closed_trades: 20
+  paper_min_profit_factor: 1.05
+  paper_max_drawdown_pct: 10.0
+  live_acknowledgement: I_ACCEPT_REAL_MONEY_RISK
+
+runtime:
+  database: data/runtime.db
+  kill_switch_file: data/KILL_SWITCH
+  session_stale_seconds: 180
+  telegram_enabled: false

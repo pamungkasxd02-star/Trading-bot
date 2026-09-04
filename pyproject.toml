@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "binance-spot-lab"
+version = "0.1.0"
+description = "Safety-gated Binance Spot research, backtest, paper, and live trading bot"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "pamungkasxd02-star"}]
+dependencies = [
+  "matplotlib>=3.9,<4",
+  "numpy>=2.0,<3",
+  "pandas>=2.2,<3",
+  "pydantic>=2.9,<3",
+  "pydantic-settings>=2.5,<3",
+  "PyYAML>=6.0,<7",
+  "websockets>=13,<17",
+]
+
+[project.optional-dependencies]
+ml = ["scikit-learn>=1.5,<2"]
+dev = ["pytest>=8.3,<10", "ruff>=0.9,<1"]
+
+[project.scripts]
+spotlab = "spotlab.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spotlab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
