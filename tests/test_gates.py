@@ -55,6 +55,27 @@ def test_journal_rejects_second_session_and_recovers_stale_one(tmp_path) -> None
     assert second != first
 
 
+def test_runtime_health_tracks_fresh_and_stale_heartbeat(tmp_path) -> None:
+    journal = TradingJournal(tmp_path / "runtime.db")
+    session = journal.start_session("paper")
+    assert journal.runtime_health("paper", stale_seconds=30)["healthy"]
+    stale = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+    with sqlite3.connect(journal.database) as connection:
+        connection.execute("UPDATE sessions SET last_heartbeat=? WHERE id=?", (stale, session))
+    health = journal.runtime_health("paper", stale_seconds=30)
+    assert not health["healthy"]
+    assert health["heartbeat_age_seconds"] >= 300
+
+
+def test_runtime_backup_is_consistent(tmp_path) -> None:
+    journal = TradingJournal(tmp_path / "runtime.db")
+    session = journal.start_session("paper")
+    output = journal.backup(tmp_path / "backups" / "runtime.db")
+    restored = TradingJournal(output)
+    assert restored.runtime_health("paper", stale_seconds=30)["healthy"]
+    assert session == 1
+
+
 def test_runtime_counts_heartbeat_not_wall_clock(tmp_path) -> None:
     journal = TradingJournal(tmp_path / "runtime.db")
     session = journal.start_session("paper")

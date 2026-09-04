@@ -41,3 +41,11 @@ detik; session basi dapat dipulihkan, sedangkan dua runner aktif untuk mode sama
 
 Kill-switch berupa file sengaja sederhana dan dapat diaudit. Ia menghentikan runner, tetapi
 tidak membatalkan OCO exchange-side.
+
+## Runtime container
+
+Compose menjalankan satu paper worker tanpa inbound port. Root filesystem read-only;
+market cache, journal, posisi, dan kill-switch berada di named volume `/app/data`.
+Healthcheck membaca heartbeat SQLite tanpa menganggap paper gate harus sudah lulus.
+Restart policy menangani reboot/crash, sementara entrypoint memblokir subcommand `live`
+untuk mencegah deployment demo berubah menjadi production secara tidak sengaja.

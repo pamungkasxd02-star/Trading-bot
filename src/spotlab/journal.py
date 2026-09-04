@@ -156,6 +156,48 @@ class TradingJournal:
                 (now, now, status, reason, session_id),
             )
 
+    def runtime_health(self, mode: str, stale_seconds: int) -> dict[str, Any]:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, status, started_at, last_heartbeat, stop_reason
+                FROM sessions WHERE mode=? ORDER BY id DESC LIMIT 1
+                """,
+                (mode,),
+            ).fetchone()
+        if row is None:
+            return {
+                "healthy": False,
+                "mode": mode,
+                "reason": "session belum pernah dijalankan",
+            }
+        payload = dict(row)
+        heartbeat = datetime.fromisoformat(payload["last_heartbeat"])
+        age_seconds = max(0.0, (datetime.now(UTC) - heartbeat).total_seconds())
+        healthy = payload["status"] == "running" and age_seconds <= stale_seconds
+        payload.update(
+            {
+                "healthy": healthy,
+                "mode": mode,
+                "heartbeat_age_seconds": age_seconds,
+                "reason": (
+                    "ok"
+                    if healthy
+                    else f"session {payload['status']}; heartbeat {age_seconds:.1f}s lalu"
+                ),
+            }
+        )
+        return payload
+
+    def backup(self, destination: str | Path) -> Path:
+        output = Path(destination)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if output.resolve() == self.database.resolve():
+            raise ValueError("Tujuan backup tidak boleh sama dengan database runtime")
+        with self._connect() as source, sqlite3.connect(output) as target:
+            source.backup(target)
+        return output
+
     def log_signal(
         self,
         session_id: int,

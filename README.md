@@ -151,7 +151,23 @@ spotlab readiness
 spotlab export-trades --mode paper --output reports/paper-trades.csv
 ```
 
-## 5. Live — hanya setelah paper gate lulus
+## 5. Menjalankan paper bot 24/7
+
+Repository menyertakan image non-root, Docker Compose dengan restart/health check, volume
+SQLite persisten, rotasi log, live lock, serta bootstrap Ubuntu/Debian:
+
+```bash
+./scripts/server-bootstrap-ubuntu.sh
+./scripts/server-start.sh
+./scripts/server-status.sh
+```
+
+Panduan Oracle Always Free dan Google Free Tier, setup firewall, backup SQLite, update,
+kill-switch, serta batasan layanan gratis ada di
+[`docs/DEPLOY_FREE_24_7.md`](docs/DEPLOY_FREE_24_7.md). API key tetap hanya berada di
+`.env` pada server, bukan di GitHub atau image.
+
+## 6. Live — hanya setelah paper gate lulus
 
 Salin config, ubah hanya config live yang sudah ditinjau, dan set
 `exchange.testnet: false`. Jangan menggunakan key Testnet untuk production atau sebaliknya.

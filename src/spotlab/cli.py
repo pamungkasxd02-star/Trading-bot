@@ -57,6 +57,10 @@ def parser() -> argparse.ArgumentParser:
     live.add_argument("--ack", default="")
 
     commands.add_parser("readiness", help="Tampilkan research/paper/live gate")
+    health = commands.add_parser("health", help="Cek heartbeat runtime untuk container/VPS")
+    health.add_argument("--mode", choices=("paper", "live"), default="paper")
+    backup = commands.add_parser("backup", help="Backup konsisten database runtime SQLite")
+    backup.add_argument("--output", required=True)
     export = commands.add_parser("export-trades", help="Export jurnal trade ke CSV")
     export.add_argument("--mode", choices=("paper", "live"), required=True)
     export.add_argument("--output", required=True)
@@ -219,6 +223,13 @@ def _dispatch(args: argparse.Namespace) -> None:
         print(f"Live: {live_status}")
         if not (research.passed and paper.passed):
             raise SystemExit(3)
+    elif args.command == "health":
+        health = journal.runtime_health(args.mode, config.runtime.session_stale_seconds)
+        print(json.dumps(health, indent=2, default=str))
+        if not health["healthy"]:
+            raise SystemExit(1)
+    elif args.command == "backup":
+        print(journal.backup(args.output).resolve())
     elif args.command == "export-trades":
         destination = Path(args.output)
         destination.parent.mkdir(parents=True, exist_ok=True)

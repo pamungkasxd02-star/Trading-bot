@@ -23,3 +23,24 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -W error::DeprecationWarning
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: |
+          cp .env.example .env
+          cp config/default.yaml config/paper-server.yaml
+          docker compose config --quiet
+      - name: Build paper image
+        run: docker build --tag trading-bot:ci .
+      - name: Verify image and live lock
+        run: |
+          docker run --rm --entrypoint python trading-bot:ci \
+            -c 'import spotlab; assert spotlab.__version__ == "0.3.0"'
+          set +e
+          docker run --rm trading-bot:ci live
+          exit_code=$?
+          set -e
+          test "$exit_code" -eq 64

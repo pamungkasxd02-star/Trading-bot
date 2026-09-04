@@ -1,0 +1,43 @@
+name: trading-bot
+
+services:
+  paper:
+    image: trading-bot:0.3.0
+    build:
+      context: .
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPOTLAB_CONTAINER_MODE: paper
+      TZ: UTC
+    command: ["paper"]
+    volumes:
+      - spotlab-data:/app/data
+      - ./config:/app/config:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.0
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "spotlab-container", "health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 5m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  spotlab-data:
