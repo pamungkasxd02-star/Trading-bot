@@ -60,8 +60,8 @@ tetapi broker adapter terpisah.
 Persyaratan: Python 3.11+ dan akun Binance Spot Testnet untuk tahap paper.
 
 ```bash
-git clone https://github.com/pamungkasxd02-star/binance-spot-lab.git
-cd binance-spot-lab
+git clone https://github.com/pamungkasxd02-star/Trading-bot.git
+cd Trading-bot
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
