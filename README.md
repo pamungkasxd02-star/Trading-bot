@@ -1,5 +1,12 @@
 # Binance Spot Lab — modal dinamis (baseline 20 USDT)
 
+**v0.5:** tersedia setup otomatis **GitHub Codespaces**, replay demo tanpa API key,
+enam kandidat strategi termasuk pemisahan tren/range, serta seleksi dan stress biaya
+pada tiga modal. Target riset WR 55% **belum tercapai**; kandidat baru belum membuktikan
+perbaikan yang stabil. Lihat [cara membuka Codespaces](docs/CODESPACES.md) dan
+[laporan v0.5](reports/evaluation-v0_5/README.md). Demo adalah simulasi historis;
+paper Testnet dan live tetap memerlukan gate masing-masing.
+
 **v0.4:** scanner banyak pair Spot/USDT, strategi tren/pullback, ATR sizing, dan evaluasi
 OOS dengan saldo portofolio bersama sudah tersedia. Mulai dari
 [`docs/MULTICOIN_RESEARCH.md`](docs/MULTICOIN_RESEARCH.md) dan
@@ -173,6 +180,10 @@ spotlab --config config/validated.yaml export-trades --mode paper --output repor
 ```
 
 ## 5. Menjalankan paper bot 24/7
+
+Untuk mencoba di browser, gunakan [GitHub Codespaces](docs/CODESPACES.md). Setup otomatis
+menjalankan replay historis enam bulan. Codespaces memiliki kuota dan timeout; untuk
+paper 24/7 gunakan VM setelah validasi strategi selesai.
 
 Repository menyertakan image non-root, Docker Compose dengan restart/health check, volume
 SQLite persisten, rotasi log, live lock, serta bootstrap Ubuntu/Debian:

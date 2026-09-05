@@ -1,0 +1,17 @@
+{
+  "name": "Trading Bot Research",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "hostRequirements": { "cpus": 2 },
+  "postCreateCommand": "bash scripts/codespaces-setup.sh",
+  "waitFor": "postCreateCommand",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "terminal.integrated.env.linux": {
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
+      }
+    }
+  }
+}

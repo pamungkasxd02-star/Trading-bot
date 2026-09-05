@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Trading bot: historical demo",
+      "type": "shell",
+      "command": "bash scripts/codespaces-demo.sh",
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "Trading bot: full multi-capital research",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["scripts/research_regime.py", "--download-snapshot", "--output", "reports/regime"],
+      "problemMatcher": []
+    }
+  ]
+}

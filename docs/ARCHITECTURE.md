@@ -1,5 +1,10 @@
 # Arsitektur
 
+v0.5 menambah `regime_reversion_v3`, validasi beberapa modal, dan setup Codespaces.
+Fingerprint juga mengikat syarat riset. Demo Codespaces menggunakan replay historis,
+tanpa broker exchange dan tanpa kredit runtime paper. Workflow GitHub hanya menjalankan
+riset serta mengunggah artifact; lihat [panduan Codespaces](CODESPACES.md).
+
 ## Batas modul
 
 | Modul | Tanggung jawab | Tidak boleh |

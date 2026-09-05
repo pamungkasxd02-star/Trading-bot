@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,8 @@ from spotlab.quality import interval_milliseconds, validate_candles
 from spotlab.reporting import plot_equity
 from spotlab.strategies import build_strategy
 
+LOGGER = logging.getLogger(__name__)
+
 
 def research_fingerprint(config: AppConfig, symbols: list[str]) -> str:
     # model_copy updates may retain ints in float fields. Normalize before hashing
@@ -33,6 +36,7 @@ def research_fingerprint(config: AppConfig, symbols: list[str]) -> str:
         "universe": universe,
         "symbols": sorted(symbols),
         "costs": config.backtest.model_dump(exclude={"initial_cash"}),
+        "validation": config.research.model_dump(mode="json", exclude={"report_directory"}),
         "execution_filters": config.runtime.model_dump(
             include={
                 "history_bars",
@@ -85,11 +89,30 @@ def candidates(config: AppConfig) -> list[Candidate]:
             )
         }
     )
-    return [
+    result = [
         Candidate("baseline", baseline),
         Candidate("adaptive", adaptive),
         Candidate("adaptive_selective", selective),
     ]
+    if config.research.candidate_set == "regime":
+        # Fixed candidate family, not an unbounded search for the best historical WR.
+        result = result[:2]
+        for name, mode, volume, score in (
+            ("reversion_trend", "trend", 0.8, 55),
+            ("reversion_range", "range", 0.8, 55),
+            ("reversion_hybrid", "hybrid", 0.8, 55),
+            ("reversion_selective", "hybrid", 1.0, 70),
+        ):
+            values = config.model_dump()
+            values["strategy"].update(
+                name="regime_reversion_v3",
+                regime_mode=mode,
+                min_relative_volume=volume,
+                min_reversion_score=score,
+            )
+            values["risk"].update(stop_mode="atr", atr_stop_multiplier=1.5, reward_risk_ratio=1.2)
+            result.append(Candidate(name, AppConfig.model_validate(values)))
+    return result
 
 
 def _train_score(result: BacktestResult, config: AppConfig) -> float | None:
@@ -99,6 +122,7 @@ def _train_score(result: BacktestResult, config: AppConfig) -> float | None:
         or m.expectancy_per_trade <= 0
         or m.profit_factor < config.gates.research_min_profit_factor
         or m.max_drawdown_pct > config.gates.research_max_drawdown_pct
+        or m.win_rate_pct < config.research.target_win_rate_pct
     ):
         return None
     # Win rate alone is deliberately not the objective.
@@ -148,31 +172,39 @@ def run_walkforward(
     variants = candidates(config)
     prepared = {}
     train_scores, diagnostics = [], []
+    capitals = sorted({config.backtest.initial_cash, *config.research.evaluation_capitals})
     for candidate in variants:
+        LOGGER.info("Training candidate: %s", candidate.name)
         cfg = candidate.config
         strategy = build_strategy(cfg.strategy.name, config=cfg.strategy)
         frames = {s: strategy.prepare(frame) for s, frame in datasets.items()}
         prepared[candidate.name] = frames
-        engine = PortfolioBacktester(strategy, cfg.backtest, cfg.risk, rules)
-        training = engine.run(frames, trade_start=start, trade_end=train_end, prepared=True)
-        score = _train_score(training, cfg)
-        train_scores.append(
-            {
-                "candidate": candidate.name,
-                "score": score,
-                "train_start": start.isoformat(),
-                "train_end": train_end.isoformat(),
-                **metric_dict(training.metrics),
-            }
-        )
-    eligible = [row for row in train_scores if row["score"] is not None]
+        for capital in capitals:
+            settings = cfg.backtest.model_copy(update={"initial_cash": capital})
+            engine = PortfolioBacktester(strategy, settings, cfg.risk, rules)
+            training = engine.run(frames, trade_start=start, trade_end=train_end, prepared=True)
+            train_scores.append(
+                {
+                    "candidate": candidate.name,
+                    "score": _train_score(training, cfg),
+                    "train_start": start.isoformat(),
+                    "train_end": train_end.isoformat(),
+                    **metric_dict(training.metrics),
+                }
+            )
+    eligible = []
+    for candidate in variants:
+        scores = [row["score"] for row in train_scores if row["candidate"] == candidate.name]
+        if all(score is not None for score in scores):
+            eligible.append({"candidate": candidate.name, "score": min(scores)})
     selected = (
         sorted(eligible, key=lambda row: (-row["score"], row["candidate"]))[0]["candidate"]
         if eligible
         else None
     )
-    comparisons, summaries = [], {}
+    comparisons, summaries, capital_results = [], {}, []
     for candidate in variants:
+        LOGGER.info("Evaluating frozen candidate across capitals and costs: %s", candidate.name)
         cfg = candidate.config
         strategy = build_strategy(cfg.strategy.name, config=cfg.strategy)
         engine = PortfolioBacktester(strategy, cfg.backtest, cfg.risk, rules)
@@ -220,12 +252,82 @@ def run_walkforward(
             )
             cost_rows.append({"cost_multiplier": multiplier, **metric_dict(stress.metrics)})
         pd.DataFrame(cost_rows).to_csv(folder / "cost_sensitivity.csv", index=False)
+        # Re-run the same frozen signals at each balance. Larger balances can enable
+        # orders rejected by minimum notional, changing the shared portfolio path.
+        capital_failures = []
+        for capital in capitals:
+            if capital == cfg.backtest.initial_cash:
+                account_result = result
+                account_costs = cost_rows
+                account_positive_ratio = positive / len(windows)
+            else:
+                settings = cfg.backtest.model_copy(update={"initial_cash": capital})
+                account_result = PortfolioBacktester(strategy, settings, cfg.risk, rules).run(
+                    prepared[candidate.name],
+                    trade_start=oos_start,
+                    trade_end=oos_end,
+                    prepared=True,
+                )
+                account_costs = []
+                for multiplier in (1.5, 2):
+                    stress_settings = settings.model_copy(
+                        update={
+                            "fee_bps": settings.fee_bps * multiplier,
+                            "slippage_bps": settings.slippage_bps * multiplier,
+                        }
+                    )
+                    stress = PortfolioBacktester(strategy, stress_settings, cfg.risk, rules).run(
+                        prepared[candidate.name],
+                        trade_start=oos_start,
+                        trade_end=oos_end,
+                        prepared=True,
+                    )
+                    account_costs.append(
+                        {"cost_multiplier": multiplier, **metric_dict(stress.metrics)}
+                    )
+                positive_count = 0
+                curve = account_result.equity
+                for left, right in windows:
+                    before = curve[curve.time < left]
+                    initial = float(before.iloc[-1].equity) if not before.empty else capital
+                    subset = curve[(curve.time >= left) & (curve.time < right)]
+                    final = float(subset.iloc[-1].equity) if not subset.empty else initial
+                    positive_count += final > initial
+                account_positive_ratio = positive_count / len(windows)
+                account_folder = folder / f"capital_{capital:g}"
+                account_folder.mkdir(exist_ok=True)
+                account_result.trades.to_csv(account_folder / "trades.csv", index=False)
+                pd.DataFrame(account_costs).to_csv(
+                    account_folder / "cost_sensitivity.csv", index=False
+                )
+            account = account_result.metrics
+            account_ok = (
+                account.trade_count >= cfg.research.min_oos_trades
+                and account.win_rate_pct >= cfg.research.target_win_rate_pct
+                and account.profit_factor >= cfg.gates.research_min_profit_factor
+                and account.expectancy_per_trade > 0
+                and account.max_drawdown_pct <= cfg.gates.research_max_drawdown_pct
+                and account_positive_ratio >= cfg.gates.research_min_positive_windows_ratio
+                and all(row["expectancy_per_trade"] > 0 for row in account_costs)
+            )
+            if not account_ok:
+                capital_failures.append(f"capital_validation_failed:{capital:g}")
+            capital_results.append(
+                {
+                    "candidate": candidate.name,
+                    **metric_dict(account),
+                    "positive_windows_ratio": account_positive_ratio,
+                    "metrics_passed": account_ok,
+                }
+            )
         failures = []
         m = result.metrics
         if len(windows) < cfg.research.min_folds:
             failures.append("insufficient_oos_windows")
         if m.trade_count < cfg.research.min_oos_trades:
             failures.append("insufficient_oos_trades")
+        if m.win_rate_pct < cfg.research.target_win_rate_pct:
+            failures.append("win_rate_below_research_target")
         if m.profit_factor < cfg.gates.research_min_profit_factor or m.expectancy_per_trade <= 0:
             failures.append("unprofitable_after_costs")
         if m.max_drawdown_pct > cfg.gates.research_max_drawdown_pct:
@@ -238,6 +340,9 @@ def run_walkforward(
             failures.append("source_or_exchange_filters_unverified")
         if candidate.name != selected:
             failures.append("not_selected_on_training")
+        failures.extend(capital_failures)
+        if provenance and provenance.get("evaluation_period_previously_inspected"):
+            failures.append("evaluation_period_previously_inspected")
         summary = {
             **metric_dict(m),
             "candidate": candidate.name,
@@ -250,6 +355,8 @@ def run_walkforward(
             "win_rate_ci_high_pct": high,
             "positive_windows_ratio": positive / len(windows),
             "window_count": len(windows),
+            "evaluated_capitals": capitals,
+            "target_win_rate_pct": cfg.research.target_win_rate_pct,
             "status": "RESEARCH_PASS" if not failures else "RESEARCH_FAIL",
             "failures": failures,
         }
@@ -272,6 +379,7 @@ def run_walkforward(
         summaries[candidate.name] = summary
     pd.DataFrame(train_scores).to_csv(destination / "training.csv", index=False)
     pd.DataFrame(diagnostics).to_csv(destination / "windows.csv", index=False)
+    pd.DataFrame(capital_results).to_csv(destination / "capital_sensitivity.csv", index=False)
     pd.DataFrame(comparisons).drop(columns=["symbols", "failures"]).to_csv(
         destination / "comparison.csv", index=False
     )
@@ -279,6 +387,9 @@ def run_walkforward(
         "selection": selected,
         "policy_action": "NO_TRADE" if selected is None else "CHECK_SELECTED_RESEARCH_GATE",
         "selection_rule": "initial_training_only_then_freeze",
+        "selection_objective": "worst_score_across_capitals_with_"
+        "profit_drawdown_trade_count_and_WR_constraints",
+        "evaluated_capitals": capitals,
         "train_end_exclusive": train_end.isoformat(),
         "embargo_bars": 1,
         "oos_start": oos_start.isoformat(),

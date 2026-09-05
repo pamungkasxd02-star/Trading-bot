@@ -1,0 +1,76 @@
+# Fixed research protocol. Demo/backtest only until matching research and paper gates pass.
+exchange:
+  symbol: BTCUSDT
+  interval: 4h
+  testnet: true
+data:
+  database: data/testnet-regime.db
+  research_database: data/research-regime.db
+  history_months: 36
+universe:
+  mode: explicit
+  symbols: [BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, LINKUSDT]
+  max_symbols: 30
+  min_quote_volume: 5000000
+  max_spread_bps: 20
+  min_history_days: 180
+strategy:
+  name: regime_reversion_v3
+  ema_fast: 20
+  ema_slow: 56
+  sma_trend: 100
+  rsi_min: 44
+  rsi_max: 70
+  min_adx: 20
+  daily_ema_period: 20
+  min_relative_volume: 0.8
+  regime_mode: hybrid
+  fast_rsi_period: 3
+  fast_rsi_oversold: 20
+  range_entry_rsi: 35
+  reversion_exit_rsi: 65
+  range_max_adx: 22
+  min_close_location: 0.6
+  max_signal_candle_atr: 2.5
+  max_daily_decline_pct: 0.25
+  max_daily_distance_pct: 3
+  max_pullback_distance_atr: 2
+  min_reversion_score: 55
+risk:
+  stop_mode: atr
+  atr_stop_multiplier: 1.5
+  atr_min_stop_pct: 1
+  atr_max_stop_pct: 8
+  reward_risk_ratio: 1.2
+  stop_loss_pct: 2.5
+  take_profit_pct: 5
+  risk_per_trade_pct: 1
+  max_allocation_pct: 50
+  max_position_notional_usdt: null
+  max_open_positions: 1
+  cooldown_bars: 2
+  max_candle_participation_pct: 0.1
+  daily_loss_limit_pct: 3
+  max_drawdown_pct: 10
+backtest:
+  initial_cash: 1000
+  fee_bps: 10
+  slippage_bps: 5
+research:
+  candidate_set: regime
+  report_directory: reports/regime/reversion_hybrid
+  train_months: 18
+  test_months: 3
+  min_train_trades: 20
+  min_oos_trades: 30
+  min_folds: 4
+  evaluation_capitals: [20, 1000, 10000]
+  target_win_rate_pct: 55
+runtime:
+  database: data/runtime.db
+  kill_switch_file: data/KILL_SWITCH
+  history_bars: 1000
+  streams_per_connection: 100
+  signal_batch_seconds: 3
+  max_signal_age_seconds: 120
+  supervision_seconds: 15

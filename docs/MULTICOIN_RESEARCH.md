@@ -1,5 +1,9 @@
 # Multi-pair dan strategi adaptif — v0.4
 
+Tambahan v0.5 tersedia pada [setup Codespaces](CODESPACES.md) dan
+[laporan regime](../reports/evaluation-v0_5/README.md). Penjelasan v0.4 di bawah tetap
+menjadi rujukan baseline; kandidat baru juga belum lolos riset.
+
 Versi ini menambah scanner Binance Spot/USDT, ranking sinyal, strategi adaptif, dan
 evaluasi portofolio. Dukungan pair tidak berarti semua coin layak ditradingkan. Universe
 berisi pair yang tersedia di lingkungan exchange yang dipilih, masih TRADING, mengizinkan
@@ -51,6 +55,18 @@ equity akun, jarak stop sesudah pembulatan tick, dan cadangan biaya. Modal 20 US
 preset backtest; modal akun tidak dibatasi 20 USDT.
 
 ## Proses riset
+
+Preset baru `config/regime.yaml` memakai `regime_reversion_v3`. Strategi membedakan
+tren harian naik dan range yang tidak sedang turun tajam, kemudian mencari rebound
+dengan RSI cepat, posisi close dalam candle, Bollinger Band, relative volume, dan ATR.
+EMA hari sebelumnya juga memakai hari UTC yang selesai. Candle shock dan rebound
+yang belum terkonfirmasi dilewati. Skor tetap merupakan ranking, bukan probabilitas.
+
+`research.candidate_set: regime` membandingkan enam kandidat. `evaluation_capitals`
+menentukan skala modal yang **seluruhnya** harus lolos training dan validasi; target
+WR dari `target_win_rate_pct` tidak menggantikan syarat profit factor, expectancy,
+jumlah trade, dan drawdown. Konfigurasi tersebut ikut fingerprint. Nilai 55% pada
+preset merupakan target yang diuji, bukan hasil yang dijanjikan.
 
 Fetch data publik tanpa credential production ke database riset yang terpisah:
 

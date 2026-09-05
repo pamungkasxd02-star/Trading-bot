@@ -83,11 +83,11 @@ def adx(frame: pd.DataFrame, period: int = 14) -> pd.Series:
     return dx.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
 
 
-def completed_daily_trend(frame: pd.DataFrame, period: int) -> pd.Series:
+def completed_daily_trend(frame: pd.DataFrame, period: int, *, lag_days: int = 0) -> pd.Series:
     """Daily EMA becomes visible only after that UTC day closes."""
     source = frame.set_index(pd.to_datetime(frame["open_time"], utc=True))["close"]
     daily = source.resample("1D", closed="left", label="right").last()
-    daily_ema = ema(daily, period).rename("daily_ema").reset_index()
+    daily_ema = ema(daily, period).shift(lag_days).rename("daily_ema").reset_index()
     daily_ema.columns = ["available_at", "daily_ema"]
     closed = pd.DataFrame({"asof": pd.to_datetime(frame["close_time"], utc=True)})
     return pd.merge_asof(

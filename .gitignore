@@ -13,6 +13,8 @@ reports/*
 !reports/baseline/**
 !reports/evaluation-v0_4/
 !reports/evaluation-v0_4/**
+!reports/evaluation-v0_5/
+!reports/evaluation-v0_5/**
 dist/
 build/
 *.egg-info/

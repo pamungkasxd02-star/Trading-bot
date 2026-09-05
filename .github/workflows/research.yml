@@ -1,0 +1,55 @@
+name: Research replay
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/spotlab/strategies/**'
+      - 'src/spotlab/research/**'
+      - 'src/spotlab/portfolio.py'
+      - 'config/regime.yaml'
+      - 'scripts/research_regime.py'
+      - '.github/workflows/research.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -e .
+      - name: Evaluate frozen candidates without exchange credentials
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/research_regime.py --download-snapshot --output reports/regime-ci
+      - name: Publish research status in job summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = Path('reports/regime-ci/manifest.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('Research replay only; this workflow never places orders.\n\n')
+              if report.exists():
+                  data = json.loads(report.read_text())
+                  out.write(f"Training selection: {data['selection']}\n\n")
+                  for name, row in data['results'].items():
+                      out.write(f"- {name}: {row['status']}; WR {row['win_rate_pct']:.2f}%; PF {row['profit_factor']}\n")
+              else:
+                  out.write('No completed report. Inspect the failed step.\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regime-research-${{ github.sha }}
+          path: reports/regime-ci/
+          if-no-files-found: warn
+          retention-days: 14

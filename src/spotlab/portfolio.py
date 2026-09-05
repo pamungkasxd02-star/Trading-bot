@@ -65,10 +65,14 @@ class PortfolioBacktester:
         skips = 0
         fee = self.backtest.fee_bps / 10_000
         slip = self.backtest.slippage_bps / 10_000
-        # O(1) previous-bar lookup, including warmup before the test boundary.
-        previous_rows = {s: f.shift(1) for s, f in frames.items()}
+        # Convert once: repeated pandas .loc calls dominate multi-capital research.
+        records = {s: f.to_dict("index") for s, f in frames.items()}
+        previous_rows = {
+            s: dict(zip(rows, [{}, *list(rows.values())[:-1]], strict=True))
+            for s, rows in records.items()
+        }
 
-        def close(row: pd.Series, raw_price: float, reason: str, when: pd.Timestamp) -> None:
+        def close(row: Any, raw_price: float, reason: str, when: pd.Timestamp) -> None:
             nonlocal cash, position, held
             assert position is not None and held is not None
             price = raw_price * (1 - slip)
@@ -100,8 +104,8 @@ class PortfolioBacktester:
             return cash + (position.quantity * prices[held] if position is not None else 0)
 
         for time in times:
-            rows = {s: f.loc[time] for s, f in frames.items() if time in f.index}
-            previous = {s: previous_rows[s].loc[time] for s in rows}
+            rows = {s: data[time] for s, data in records.items() if time in data}
+            previous = {s: previous_rows[s][time] for s in rows}
             opens = {**marks, **{s: float(r["open"]) for s, r in rows.items()}}
             if position is not None and held in rows:
                 row = rows[held]
@@ -109,7 +113,9 @@ class PortfolioBacktester:
                     close(row, float(row["open"]), "gap_stop", time)
                 elif float(row["open"]) >= position.take_profit_price:
                     close(row, position.take_profit_price, "take_profit", time)
-                elif pd.notna(previous[held]["exit_long"]) and bool(previous[held]["exit_long"]):
+                elif pd.notna(previous[held].get("exit_long")) and bool(
+                    previous[held].get("exit_long", False)
+                ):
                     close(row, float(row["open"]), "strategy_exit_next_open", time)
             account = marked(opens)
             if time.date() != day:

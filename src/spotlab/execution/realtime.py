@@ -191,7 +191,7 @@ class RealtimeRunner:
                 < max(self.config.strategy.sma_trend, self.config.strategy.ema_slow) + 5
             ):
                 raise RuntimeError(f"Cache {symbol} belum cukup; fetch dahulu")
-            if self.config.strategy.name == "adaptive_trend_v2":
+            if self.config.strategy.name in {"adaptive_trend_v2", "regime_reversion_v3"}:
                 days = (history.open_time.max() - history.open_time.min()).total_seconds() / 86400
                 if days < self.config.strategy.daily_ema_period + 2:
                     raise RuntimeError(f"{symbol}: candle harian selesai belum cukup untuk warmup")

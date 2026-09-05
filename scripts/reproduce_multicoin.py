@@ -7,6 +7,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 from dataclasses import asdict
 from datetime import timedelta
 from decimal import Decimal
@@ -31,9 +32,11 @@ def download_snapshot(destination: Path) -> None:
         if path.exists():
             continue
         url = f"https://api.github.com/repos/{manifest['repository']}/git/blobs/{item['blob_sha']}"
-        with urlopen(
-            Request(url, headers={"User-Agent": "spotlab-research"}), timeout=30
-        ) as response:
+        headers = {"User-Agent": "spotlab-research"}
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        with urlopen(Request(url, headers=headers), timeout=30) as response:
             payload = json.load(response)
         raw = base64.b64decode(payload["content"])
         digest = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()

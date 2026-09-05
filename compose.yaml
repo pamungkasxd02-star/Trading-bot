@@ -2,7 +2,7 @@ name: trading-bot
 
 services:
   paper:
-    image: trading-bot:0.4.0
+    image: trading-bot:0.5.0
     build:
       context: .
     init: true

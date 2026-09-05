@@ -73,6 +73,18 @@ class StrategyConfig(StrictModel):
     daily_ema_period: int = Field(20, ge=2, le=100)
     pullback_rsi: float = Field(45, ge=20, le=65)
     pullback_lookback: int = Field(5, ge=1, le=30)
+    regime_mode: Literal["trend", "range", "hybrid"] = "hybrid"
+    fast_rsi_period: int = Field(3, ge=2, le=10)
+    fast_rsi_oversold: float = Field(20, ge=5, le=40)
+    range_entry_rsi: float = Field(35, ge=15, le=45)
+    reversion_exit_rsi: float = Field(65, ge=50, le=85)
+    range_max_adx: float = Field(22, ge=10, le=35)
+    min_close_location: float = Field(0.6, ge=0.5, le=0.95)
+    max_signal_candle_atr: float = Field(2.5, gt=1, le=5)
+    max_daily_decline_pct: float = Field(0.25, ge=0, le=2)
+    max_daily_distance_pct: float = Field(3, ge=0, le=10)
+    max_pullback_distance_atr: float = Field(2, gt=0, le=5)
+    min_reversion_score: float = Field(55, ge=0, le=100)
 
     @model_validator(mode="after")
     def validate_periods(self) -> StrategyConfig:
@@ -125,6 +137,20 @@ class ResearchConfig(StrictModel):
     min_train_trades: int = Field(10, ge=1)
     min_oos_trades: int = Field(20, ge=1)
     min_folds: int = Field(3, ge=2)
+    candidate_set: Literal["baseline", "regime"] = "baseline"
+    evaluation_capitals: list[float] = Field(default_factory=list)
+    target_win_rate_pct: float = Field(0, ge=0, le=90)
+
+    @model_validator(mode="after")
+    def validate_capitals(self) -> ResearchConfig:
+        import math
+
+        if any(not math.isfinite(value) or value <= 0 for value in self.evaluation_capitals):
+            raise ValueError("evaluation_capitals harus positif dan finite")
+        self.evaluation_capitals = sorted(set(self.evaluation_capitals))
+        if len(self.evaluation_capitals) > 5:
+            raise ValueError("Maksimal lima skala modal per eksperimen")
+        return self
 
 
 class GatesConfig(StrictModel):

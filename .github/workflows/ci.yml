@@ -38,9 +38,25 @@ jobs:
       - name: Verify image and live lock
         run: |
           docker run --rm --entrypoint python trading-bot:ci \
-            -c 'import spotlab; assert spotlab.__version__ == "0.4.0"'
+            -c 'import spotlab; assert spotlab.__version__ == "0.5.0"'
           set +e
           docker run --rm trading-bot:ci live
           exit_code=$?
           set -e
           test "$exit_code" -eq 64
+
+  codespaces-setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise the Codespaces setup and historical demo
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/codespaces-setup.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codespaces-demo
+          path: reports/codespaces-demo/

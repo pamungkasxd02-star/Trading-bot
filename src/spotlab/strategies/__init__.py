@@ -1,10 +1,12 @@
 from spotlab.strategies.adaptive import AdaptiveTrendStrategy
 from spotlab.strategies.base import Strategy
+from spotlab.strategies.regime import RegimeReversionStrategy
 from spotlab.strategies.rule_based import RuleBasedStrategy
 
 STRATEGIES: dict[str, type[Strategy]] = {
     "rule_based_v1": RuleBasedStrategy,
     "adaptive_trend_v2": AdaptiveTrendStrategy,
+    "regime_reversion_v3": RegimeReversionStrategy,
 }
 
 
