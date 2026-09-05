@@ -1,0 +1,46 @@
+{
+  "repository": "Ilnyr2006-droid/python-paper-trading-agent-1-data",
+  "tree_sha": "aeec8c089e86a11253aa5ec9789117dc8c214e57",
+  "files": [
+    {
+      "file": "ADAUSDT_4h.csv",
+      "path": "data/markets/ADAUSDT_4h.csv",
+      "blob_sha": "5c7d76c32d46eda33aafe7485521490860021eb9"
+    },
+    {
+      "file": "AVAXUSDT_4h.csv",
+      "path": "data/markets/AVAXUSDT_4h.csv",
+      "blob_sha": "b918c89e43c883cc657ceddf069389be3ae94f6c"
+    },
+    {
+      "file": "BNBUSDT_4h.csv",
+      "path": "data/markets/BNBUSDT_4h.csv",
+      "blob_sha": "861f15874da8404df7e927484a357bf8ab5afc6e"
+    },
+    {
+      "file": "BTCUSDT_4h.csv",
+      "path": "data/markets/BTCUSDT_4h.csv",
+      "blob_sha": "f5c4edf585bcbe76a1e8c17ab06659cd961a587d"
+    },
+    {
+      "file": "ETHUSDT_4h.csv",
+      "path": "data/markets/ETHUSDT_4h.csv",
+      "blob_sha": "ed02f8fdfe3e9196436e0b27813732e00df3bf04"
+    },
+    {
+      "file": "LINKUSDT_4h.csv",
+      "path": "data/markets/LINKUSDT_4h.csv",
+      "blob_sha": "c43129e5a8f649a606810e90a8e7b47428867575"
+    },
+    {
+      "file": "SOLUSDT_4h.csv",
+      "path": "data/markets/SOLUSDT_4h.csv",
+      "blob_sha": "13a12a7a778a6b37dc647176d2839d2da2b2bdac"
+    },
+    {
+      "file": "XRPUSDT_4h.csv",
+      "path": "data/markets/XRPUSDT_4h.csv",
+      "blob_sha": "d8fe6be4a4aaacaf53ea2ba6c01d49704cb03e54"
+    }
+  ]
+}

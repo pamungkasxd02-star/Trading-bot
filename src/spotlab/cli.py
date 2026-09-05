@@ -21,7 +21,9 @@ from spotlab.gates import assert_live_gate, paper_gate, research_gate
 from spotlab.journal import TradingJournal
 from spotlab.notifier import TelegramNotifier
 from spotlab.reporting import terminal_summary, write_backtest_report
+from spotlab.research.walkforward import research_fingerprint, run_walkforward
 from spotlab.strategies import build_strategy
+from spotlab.universe import discover_universe
 from spotlab.validation import validate_rolling_windows
 
 LOGGER = logging.getLogger(__name__)
@@ -35,6 +37,28 @@ def parser() -> argparse.ArgumentParser:
 
     fetch = commands.add_parser("fetch", help="Fetch dan cache OHLCV + exchange filters")
     fetch.add_argument("--months", type=int)
+    universe = commands.add_parser(
+        "universe", help="Temukan pair Spot USDT dengan volume/spread/OCO filter"
+    )
+    universe.add_argument("--all", action="store_true")
+    pool = commands.add_parser(
+        "fetch-universe", help="Cache banyak pair; --production untuk data riset publik"
+    )
+    pool.add_argument("--production", action="store_true")
+    pool.add_argument("--months", type=int)
+    research = commands.add_parser(
+        "research", help="Seleksi train lalu evaluasi OOS portfolio dan cost stress"
+    )
+    research.add_argument("--symbols", nargs="+")
+    research.add_argument("--output", default="reports/research")
+    research.add_argument("--initial-cash", type=float)
+    scan = commands.add_parser("scan", help="Ranking sinyal dari cache riset; tidak mengirim order")
+    scan.add_argument("--symbols", nargs="+")
+    commands.add_parser("inspect-intent", help="Tampilkan intent paper yang perlu rekonsiliasi")
+    clear_intent = commands.add_parser(
+        "clear-intent", help="Hanya setelah order diperiksa di Testnet"
+    )
+    clear_intent.add_argument("--ack", required=True)
 
     backtest = commands.add_parser("backtest", help="Backtest dari cache lokal")
     backtest.add_argument("--months", type=int)
@@ -57,6 +81,9 @@ def parser() -> argparse.ArgumentParser:
     live.add_argument("--ack", default="")
 
     commands.add_parser("readiness", help="Tampilkan research/paper/live gate")
+    commands.add_parser(
+        "research-readiness", help="Cek kecocokan bukti riset sebelum startup paper"
+    )
     health = commands.add_parser("health", help="Cek heartbeat runtime untuk container/VPS")
     health.add_argument("--mode", choices=("paper", "live"), default="paper")
     backup = commands.add_parser("backup", help="Backup konsisten database runtime SQLite")
@@ -106,7 +133,9 @@ def _notifier(config: AppConfig, secrets: Secrets) -> TelegramNotifier:
 def _run_execution(config: AppConfig, secrets: Secrets, mode: str) -> None:
     store = MarketDataStore(config.data.database)
     journal = TradingJournal(config.runtime.database)
-    rules = store.load_symbol_rules(config.exchange.symbol)
+    symbols = _execution_symbols(config, store)
+    fingerprint = research_fingerprint(config, symbols)
+    rules = store.load_symbol_rules(symbols[0])
     if mode == "paper":
         if not config.exchange.testnet:
             raise RuntimeError("Paper mode wajib exchange.testnet=true")
@@ -117,6 +146,12 @@ def _run_execution(config: AppConfig, secrets: Secrets, mode: str) -> None:
             raise RuntimeError("Live mode memerlukan config khusus dengan exchange.testnet=false")
         client = _client(config, secrets, testnet=False)
         broker = LiveBroker(client, rules, expected_testnet=False)
+    brokers = {
+        symbol: type(broker)(
+            client, store.load_symbol_rules(symbol), expected_testnet=mode == "paper"
+        )
+        for symbol in symbols
+    }
     runner = RealtimeRunner(
         mode=mode,
         config=config,
@@ -125,8 +160,21 @@ def _run_execution(config: AppConfig, secrets: Secrets, mode: str) -> None:
         journal=journal,
         broker=broker,
         notifier=_notifier(config, secrets),
+        brokers=brokers,
+        fingerprint=fingerprint,
     )
     asyncio.run(run_realtime(runner))
+
+
+def _execution_symbols(config: AppConfig, store: MarketDataStore) -> list[str]:
+    if config.universe.mode == "single":
+        return [config.exchange.symbol.upper()]
+    if config.universe.mode == "explicit":
+        return sorted(config.universe.symbols)
+    symbols = store.metadata("universe").get("symbols", [])
+    if not symbols:
+        raise RuntimeError("Universe belum di-cache; jalankan fetch-universe")
+    return sorted(symbols)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -150,7 +198,119 @@ def _dispatch(args: argparse.Namespace) -> None:
     symbol = config.exchange.symbol
     interval = config.exchange.interval
 
-    if args.command == "fetch":
+    if args.command == "universe":
+        chosen_config = config
+        if args.all:
+            chosen_config = config.model_copy(
+                update={"universe": config.universe.model_copy(update={"mode": "all"})}
+            )
+        payload = discover_universe(_client(config, secrets), chosen_config)
+        payload.pop("exchange_info")
+        print(json.dumps(payload, indent=2))
+    elif args.command == "fetch-universe":
+        cfg = (
+            config.model_copy(
+                update={"exchange": config.exchange.model_copy(update={"testnet": False})}
+            )
+            if args.production
+            else config
+        )
+        client = BinanceRESTClient(testnet=False) if args.production else _client(cfg, secrets)
+        target = MarketDataStore(config.data.research_database) if args.production else store
+        expected = "production" if not cfg.exchange.testnet else "testnet"
+        previous = target.metadata("market")
+        if previous and previous.get("environment") != expected:
+            raise RuntimeError("Database tidak boleh mencampur data production dan Testnet")
+        target.set_metadata("market", {"environment": expected, "exchange_verified": False})
+        discovery = discover_universe(client, cfg)
+        symbols = [item["symbol"] for item in discovery["selected"]]
+        if not symbols:
+            raise RuntimeError("Tidak ada pair yang memenuhi filter universe")
+        end = datetime.now(UTC)
+        start = (
+            pd.Timestamp(end) - pd.DateOffset(months=args.months or config.data.history_months)
+        ).to_pydatetime()
+        for name in symbols:
+            count = fetch_history(client, target, name, interval, start, end)
+            print(f"{name}: {count} closed candles")
+        target.set_metadata("universe", {"symbols": symbols, "asof": end.isoformat()})
+        target.set_metadata(
+            "market",
+            {
+                "environment": expected,
+                "exchange_verified": expected == "production",
+                "source": client.base_url,
+                "fetched_at": end.isoformat(),
+                "symbols": symbols,
+            },
+        )
+    elif args.command in {"research", "scan"}:
+        research_store = MarketDataStore(config.data.research_database)
+        symbols = (
+            [s.upper() for s in args.symbols]
+            if args.symbols
+            else _execution_symbols(config, research_store)
+        )
+        datasets = {
+            name: _period(research_store.load_candles(name, interval), config.data.history_months)
+            for name in symbols
+        }
+        if any(frame.empty for frame in datasets.values()):
+            raise RuntimeError("Cache riset kosong; jalankan fetch-universe --production")
+        if args.command == "scan":
+            from spotlab.selection import ranked_entries
+
+            rows = {
+                s: _build(config).prepare(f.tail(config.runtime.history_bars)).iloc[-1]
+                for s, f in datasets.items()
+            }
+            print(
+                json.dumps(
+                    {
+                        "source": "cached_closed_candles",
+                        "ranked_entries": ranked_entries(rows),
+                        "signals": {
+                            s: {
+                                "asof": str(r["close_time"]),
+                                "score": float(r["signal_score"]),
+                                "reason": r["signal_reason"],
+                            }
+                            for s, r in rows.items()
+                        },
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            if args.initial_cash is not None:
+                config = config.model_copy(
+                    update={
+                        "backtest": config.backtest.model_copy(
+                            update={"initial_cash": args.initial_cash}
+                        )
+                    }
+                )
+                config = AppConfig.model_validate(config.model_dump())
+            rules = {name: research_store.load_symbol_rules(name) for name in symbols}
+            manifest = run_walkforward(
+                datasets, rules, config, args.output, provenance=research_store.metadata("market")
+            )
+            print(f"Selected from training: {manifest['selection']}")
+            for name, row in manifest["results"].items():
+                print(
+                    f"{name}: WR {row['win_rate_pct']:.2f}% | PF {row['profit_factor']} | "
+                    f"DD {row['max_drawdown_pct']:.2f}% | {row['status']}"
+                )
+    elif args.command == "inspect-intent":
+        print(json.dumps(journal.pending_intent("paper"), indent=2))
+    elif args.command == "clear-intent":
+        if args.ack != "I_RECONCILED_TESTNET_ORDERS":
+            raise RuntimeError("Periksa order/posisi Testnet sebelum menghapus intent")
+        if not config.exchange.testnet:
+            raise RuntimeError("Command ini hanya untuk Testnet")
+        journal.clear_intent("paper")
+        print("Intent paper dihapus; kill-switch tetap perlu diperiksa")
+    elif args.command == "fetch":
         months = args.months or config.data.history_months
         end = datetime.now(UTC)
         start = (pd.Timestamp(end) - pd.DateOffset(months=months)).to_pydatetime()
@@ -204,24 +364,55 @@ def _dispatch(args: argparse.Namespace) -> None:
         metrics = run_ml_research(candles, args.output, model_name=args.model, horizon=args.horizon)
         print(json.dumps(metrics, indent=2))
     elif args.command == "paper":
-        research = research_gate("reports/baseline", config.gates)
+        fingerprint = research_fingerprint(config, _execution_symbols(config, store))
+        research = research_gate(config.research.report_directory, config.gates, fingerprint)
         if not research.passed:
             details = "; ".join(research.reasons) or "research gate belum lulus"
             raise RuntimeError(f"PAPER BLOCKED: {details}")
         _run_execution(config, secrets, "paper")
     elif args.command == "live":
-        assert_live_gate("reports/baseline", journal, config.gates, args.ack)
+        if config.universe.mode != "single" or config.strategy.name != "rule_based_v1":
+            raise RuntimeError(
+                "LIVE BLOCKED: perlu 14 hari paper dan peninjauan modul baru "
+                "sebelum rollout multi-pair"
+            )
+        fingerprint = research_fingerprint(config, _execution_symbols(config, store))
+        assert_live_gate(
+            config.research.report_directory, journal, config.gates, args.ack, fingerprint
+        )
         _run_execution(config, secrets, "live")
-    elif args.command == "readiness":
-        research = research_gate("reports/baseline", config.gates)
-        paper = paper_gate(journal, config.gates)
+    elif args.command in {"readiness", "research-readiness"}:
+        fingerprint = research_fingerprint(config, _execution_symbols(config, store))
+        research = research_gate(config.research.report_directory, config.gates, fingerprint)
+        if args.command == "research-readiness":
+            print(
+                json.dumps(
+                    {
+                        "passed": research.passed,
+                        "reasons": research.reasons,
+                        "fingerprint": fingerprint,
+                    },
+                    indent=2,
+                )
+            )
+            if not research.passed:
+                raise SystemExit(2)
+            return
+        paper = paper_gate(journal, config.gates, fingerprint)
         print(f"Research: {'PASS' if research.passed else 'BLOCKED'}")
         print(json.dumps(research.metrics, indent=2))
         print(f"Paper: {'PASS' if paper.passed else 'BLOCKED'}")
         print(json.dumps(paper.metrics, indent=2, default=str))
-        live_status = "READY (ack tetap wajib)" if research.passed and paper.passed else "BLOCKED"
+        live_supported = (
+            config.universe.mode == "single" and config.strategy.name == "rule_based_v1"
+        )
+        live_status = (
+            "READY (ack tetap wajib)"
+            if research.passed and paper.passed and live_supported
+            else "BLOCKED"
+        )
         print(f"Live: {live_status}")
-        if not (research.passed and paper.passed):
+        if not (research.passed and paper.passed and live_supported):
             raise SystemExit(3)
     elif args.command == "health":
         health = journal.runtime_health(args.mode, config.runtime.session_stale_seconds)

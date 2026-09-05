@@ -11,6 +11,8 @@ data/*
 reports/*
 !reports/baseline/
 !reports/baseline/**
+!reports/evaluation-v0_4/
+!reports/evaluation-v0_4/**
 dist/
 build/
 *.egg-info/

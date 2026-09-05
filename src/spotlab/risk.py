@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import ROUND_DOWN, Decimal
+from math import isfinite
 
 from spotlab.config import RiskConfig
 from spotlab.models import SymbolRules
@@ -43,16 +44,37 @@ class RiskManager:
         equity: float,
         entry_price: float,
         available_quote: float | None = None,
+        *,
+        atr_value: float | None = None,
+        cost_bps: float = 0,
     ) -> SizedOrder:
-        if equity <= 0 or entry_price <= 0:
+        if not all(isfinite(v) and v > 0 for v in (equity, entry_price)):
             raise RiskViolation("Equity dan harga harus positif")
-        if available_quote is not None and available_quote < 0:
+        if available_quote is not None and (not isfinite(available_quote) or available_quote < 0):
             raise RiskViolation("Saldo quote tersedia tidak boleh negatif")
         cfg = self.config
         price = Decimal(str(entry_price))
         equity_decimal = Decimal(str(equity))
+        stop_pct = cfg.stop_loss_pct
+        target_pct = cfg.take_profit_pct
+        if cfg.stop_mode == "atr":
+            if atr_value is None or not isfinite(atr_value) or atr_value <= 0:
+                raise RiskViolation("ATR positif wajib tersedia untuk sizing volatilitas")
+            stop_pct = max(
+                cfg.atr_min_stop_pct,
+                min(cfg.atr_max_stop_pct, atr_value / entry_price * 100 * cfg.atr_stop_multiplier),
+            )
+            target_pct = stop_pct * cfg.reward_risk_ratio
+        stop = floor_to_tick(
+            price * (Decimal("1") - Decimal(str(stop_pct / 100))), self.rules.tick_size
+        )
+        take_profit = floor_to_tick(
+            price * (Decimal("1") + Decimal(str(target_pct / 100))), self.rules.tick_size
+        )
+        if not Decimal("0") < stop < price < take_profit:
+            raise RiskViolation("Tick size tidak memungkinkan stop dan target yang valid")
         risk_budget = equity_decimal * Decimal(str(cfg.risk_per_trade_pct / 100))
-        risk_per_unit = price * Decimal(str(cfg.stop_loss_pct / 100))
+        risk_per_unit = price - stop + price * Decimal(str(cost_bps / 10_000))
         by_risk = risk_budget / risk_per_unit
         by_allocation = equity_decimal * Decimal(str(cfg.max_allocation_pct / 100)) / price
         limits = [by_risk, by_allocation, self.rules.max_qty]
@@ -71,14 +93,13 @@ class RiskManager:
             raise RiskViolation(
                 f"Notional {notional} di bawah minimum exchange {self.rules.min_notional}"
             )
-        stop = floor_to_tick(
-            price * (Decimal("1") - Decimal(str(cfg.stop_loss_pct / 100))),
-            self.rules.tick_size,
-        )
-        take_profit = floor_to_tick(
-            price * (Decimal("1") + Decimal(str(cfg.take_profit_pct / 100))),
-            self.rules.tick_size,
-        )
+        if quantity * stop * Decimal("0.998") < self.rules.min_notional:
+            raise RiskViolation("Notional stop di bawah minimum exchange; posisi dilewati")
+        if self.rules.max_notional is not None and quantity * take_profit > self.rules.max_notional:
+            quantity = floor_to_step(self.rules.max_notional / take_profit, self.rules.step_size)
+            notional = quantity * price
+            if quantity < self.rules.min_qty or quantity * stop < self.rules.min_notional:
+                raise RiskViolation("Tidak ada ukuran yang memenuhi notional entry dan OCO")
         return SizedOrder(quantity, notional, stop, take_profit)
 
     def assert_loss_limits(
@@ -87,7 +108,7 @@ class RiskManager:
         day_start_equity: float,
         peak_equity: float,
     ) -> None:
-        if equity <= 0 or day_start_equity <= 0 or peak_equity <= 0:
+        if not all(isfinite(v) and v > 0 for v in (equity, day_start_equity, peak_equity)):
             raise RiskViolation("Equity risiko harus lebih besar dari nol")
         daily_loss = (day_start_equity - equity) / day_start_equity * 100
         drawdown = (peak_equity - equity) / peak_equity * 100

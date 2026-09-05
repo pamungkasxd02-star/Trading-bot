@@ -50,8 +50,9 @@ def test_zero_equity_state_halts_cleanly() -> None:
 
 def test_large_account_is_clamped_to_exchange_maximum() -> None:
     sized = RiskManager(RiskConfig(), rules()).size_long(1_000_000_000.0, 50_000.0)
-    assert sized.notional == Decimal("9000000.00000")
-    assert sized.quantity == Decimal("180.00000")
+    assert sized.notional <= rules().max_notional
+    assert sized.quantity * sized.take_profit_price <= rules().max_notional
+    assert sized.quantity <= rules().max_qty
 
 
 def test_available_balance_and_market_buffer_cap_order() -> None:

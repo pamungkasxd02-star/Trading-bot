@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class ExchangeConfig(StrictModel):
@@ -23,6 +23,30 @@ class ExchangeConfig(StrictModel):
 class DataConfig(StrictModel):
     database: Path = Path("data/spotlab.db")
     history_months: int = Field(24, ge=6, le=120)
+    research_database: Path = Path("data/research.db")
+
+
+class UniverseConfig(StrictModel):
+    mode: Literal["single", "explicit", "all"] = "single"
+    symbols: list[str] = Field(default_factory=list)
+    quote_asset: Literal["USDT"] = "USDT"
+    max_symbols: int | None = Field(30, ge=1, le=1500)
+    min_quote_volume: float = Field(5_000_000, ge=0)
+    max_spread_bps: float = Field(20, gt=0, le=200)
+    min_history_days: int = Field(180, ge=30)
+    excluded_bases: list[str] = Field(
+        default_factory=lambda: ["USDC", "FDUSD", "TUSD", "USDP", "DAI", "BUSD", "EUR", "USDE"]
+    )
+
+    @model_validator(mode="after")
+    def validate_symbols(self) -> UniverseConfig:
+        self.symbols = list(dict.fromkeys(item.upper() for item in self.symbols))
+        self.excluded_bases = [item.upper() for item in self.excluded_bases]
+        if self.mode == "explicit" and not self.symbols:
+            raise ValueError("universe.symbols wajib diisi untuk mode explicit")
+        if any(not item.endswith(self.quote_asset) for item in self.symbols):
+            raise ValueError("Semua symbol harus menggunakan quote USDT")
+        return self
 
 
 class StrategyConfig(StrictModel):
@@ -40,6 +64,15 @@ class StrategyConfig(StrictModel):
     bb_std: float = Field(2.0, gt=0)
     volume_period: int = Field(20, ge=2)
     min_confirmations: int = Field(3, ge=1, le=4)
+    atr_period: int = Field(14, ge=2)
+    adx_period: int = Field(14, ge=2)
+    min_adx: float = Field(20, ge=0, le=60)
+    min_atr_pct: float = Field(0.3, ge=0)
+    max_atr_pct: float = Field(5, gt=0, le=30)
+    min_relative_volume: float = Field(0.8, ge=0)
+    daily_ema_period: int = Field(20, ge=2, le=100)
+    pullback_rsi: float = Field(45, ge=20, le=65)
+    pullback_lookback: int = Field(5, ge=1, le=30)
 
     @model_validator(mode="after")
     def validate_periods(self) -> StrategyConfig:
@@ -49,6 +82,8 @@ class StrategyConfig(StrictModel):
             raise ValueError("macd_fast must be lower than macd_slow")
         if self.rsi_min >= self.rsi_max:
             raise ValueError("rsi_min must be lower than rsi_max")
+        if self.min_atr_pct >= self.max_atr_pct:
+            raise ValueError("min_atr_pct must be lower than max_atr_pct")
         return self
 
 
@@ -68,6 +103,28 @@ class RiskConfig(StrictModel):
     daily_loss_limit_pct: float = Field(3.0, gt=0, le=20)
     max_drawdown_pct: float = Field(10.0, gt=0, le=50)
     max_open_positions: int = Field(1, ge=1, le=1)
+    stop_mode: Literal["fixed", "atr"] = "fixed"
+    atr_stop_multiplier: float = Field(2.0, gt=0, le=10)
+    atr_min_stop_pct: float = Field(1.0, gt=0, le=20)
+    atr_max_stop_pct: float = Field(8.0, gt=0, le=20)
+    reward_risk_ratio: float = Field(1.5, ge=1, le=5)
+    cooldown_bars: int = Field(0, ge=0, le=100)
+    max_candle_participation_pct: float = Field(0.1, gt=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_stop_bounds(self) -> RiskConfig:
+        if self.atr_min_stop_pct > self.atr_max_stop_pct:
+            raise ValueError("atr_min_stop_pct harus <= atr_max_stop_pct")
+        return self
+
+
+class ResearchConfig(StrictModel):
+    report_directory: Path = Path("reports/research")
+    train_months: int = Field(9, ge=3)
+    test_months: int = Field(3, ge=1)
+    min_train_trades: int = Field(10, ge=1)
+    min_oos_trades: int = Field(20, ge=1)
+    min_folds: int = Field(3, ge=2)
 
 
 class GatesConfig(StrictModel):
@@ -86,16 +143,30 @@ class RuntimeConfig(StrictModel):
     kill_switch_file: Path = Path("data/KILL_SWITCH")
     session_stale_seconds: int = Field(180, ge=30, le=3600)
     telegram_enabled: bool = False
+    history_bars: int = Field(1000, ge=200, le=5000)
+    streams_per_connection: int = Field(100, ge=1, le=200)
+    signal_batch_seconds: float = Field(3, ge=0.1, le=10)
+    max_signal_age_seconds: int = Field(120, ge=30, le=900)
+    max_signal_price_drift_bps: float = Field(50, gt=0, le=500)
+    supervision_seconds: int = Field(15, ge=5, le=30)
 
 
 class AppConfig(StrictModel):
     exchange: ExchangeConfig = ExchangeConfig()
     data: DataConfig = DataConfig()
+    universe: UniverseConfig = UniverseConfig()
     strategy: StrategyConfig = StrategyConfig()
     backtest: BacktestConfig = BacktestConfig()
     risk: RiskConfig = RiskConfig()
     gates: GatesConfig = GatesConfig()
     runtime: RuntimeConfig = RuntimeConfig()
+    research: ResearchConfig = ResearchConfig()
+
+    @model_validator(mode="after")
+    def validate_storage(self) -> AppConfig:
+        if self.data.database == self.data.research_database:
+            raise ValueError("Database riset dan execution harus terpisah")
+        return self
 
 
 class Secrets(BaseSettings):
@@ -111,6 +182,8 @@ def _resolve_paths(config: AppConfig, base: Path) -> AppConfig:
     data = config.model_dump()
     for section, key in (
         ("data", "database"),
+        ("data", "research_database"),
+        ("research", "report_directory"),
         ("runtime", "database"),
         ("runtime", "kill_switch_file"),
     ):

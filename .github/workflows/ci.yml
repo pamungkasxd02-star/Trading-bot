@@ -38,7 +38,7 @@ jobs:
       - name: Verify image and live lock
         run: |
           docker run --rm --entrypoint python trading-bot:ci \
-            -c 'import spotlab; assert spotlab.__version__ == "0.3.0"'
+            -c 'import spotlab; assert spotlab.__version__ == "0.4.0"'
           set +e
           docker run --rm trading-bot:ci live
           exit_code=$?

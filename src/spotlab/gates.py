@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,7 +16,9 @@ class GateResult:
     metrics: dict[str, float | int | str]
 
 
-def research_gate(report_directory: str | Path, config: GatesConfig) -> GateResult:
+def research_gate(
+    report_directory: str | Path, config: GatesConfig, fingerprint: str | None = None
+) -> GateResult:
     report_path = Path(report_directory) / "validation_summary.json"
     if not report_path.exists():
         return GateResult(False, (f"Laporan validasi tidak ditemukan: {report_path}",), {})
@@ -25,6 +28,14 @@ def research_gate(report_directory: str | Path, config: GatesConfig) -> GateResu
     positive_ratio = float(payload.get("positive_windows_ratio", 0))
     expectancy = float(payload.get("expectancy_per_trade", 0))
     reasons: list[str] = []
+    if fingerprint is not None and payload.get("fingerprint") != fingerprint:
+        reasons.append(
+            "Laporan riset tidak cocok dengan strategi, risiko, biaya, interval, atau pair"
+        )
+    if not all(
+        math.isfinite(value) for value in (drawdown, positive_ratio, expectancy)
+    ) or math.isnan(profit_factor):
+        reasons.append("Metrik riset tidak valid")
     if profit_factor < config.research_min_profit_factor:
         reasons.append("Profit factor riset belum memenuhi minimum")
     if drawdown > config.research_max_drawdown_pct:
@@ -38,15 +49,17 @@ def research_gate(report_directory: str | Path, config: GatesConfig) -> GateResu
     return GateResult(not reasons, tuple(reasons), payload)
 
 
-def paper_gate(journal: TradingJournal, config: GatesConfig) -> GateResult:
-    runtime_days = journal.paper_runtime_seconds() / 86_400
-    trades = journal.trade_rows("paper")
+def paper_gate(
+    journal: TradingJournal, config: GatesConfig, fingerprint: str | None = None
+) -> GateResult:
+    runtime_days = journal.paper_runtime_seconds(fingerprint) / 86_400
+    trades = journal.trade_rows("paper", fingerprint)
     pnl = [float(row["net_pnl"]) for row in trades]
     wins = sum(value for value in pnl if value > 0)
     losses = abs(sum(value for value in pnl if value < 0))
     profit_factor = wins / losses if losses else (float("inf") if wins else 0.0)
     expectancy = sum(pnl) / len(pnl) if pnl else 0.0
-    snapshots = journal.equity_rows("paper")
+    snapshots = journal.equity_rows("paper", fingerprint)
     equity_values = [float(row["equity"]) for row in snapshots]
     peak = equity_values[0] if equity_values else 0.0
     max_drawdown = 0.0
@@ -84,9 +97,10 @@ def assert_live_gate(
     journal: TradingJournal,
     config: GatesConfig,
     acknowledgement: str,
+    fingerprint: str | None = None,
 ) -> None:
-    research = research_gate(report_directory, config)
-    paper = paper_gate(journal, config)
+    research = research_gate(report_directory, config, fingerprint)
+    paper = paper_gate(journal, config, fingerprint)
     failures = [*research.reasons, *paper.reasons]
     if acknowledgement != config.live_acknowledgement:
         failures.append("Acknowledgement live tidak cocok")

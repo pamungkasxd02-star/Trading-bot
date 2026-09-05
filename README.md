@@ -1,5 +1,14 @@
 # Binance Spot Lab — modal dinamis (baseline 20 USDT)
 
+**v0.4:** scanner banyak pair Spot/USDT, strategi tren/pullback, ATR sizing, dan evaluasi
+OOS dengan saldo portofolio bersama sudah tersedia. Mulai dari
+[`docs/MULTICOIN_RESEARCH.md`](docs/MULTICOIN_RESEARCH.md) dan
+[`hasil pembanding delapan pair`](reports/evaluation-v0_4/README.md).
+Laporan eksperimen baru belum meloloskan seleksi/gate; paper/live belum diaktifkan.
+Pada snapshot delapan pair, adaptive mendapat WR 56,52% pada modal 20 USDT, tetapi
+hanya 35,71% pada 1.000–10.000 USDT dengan return sekitar −5,8%. Perbedaan kelayakan
+minimum order mengubah trade yang dieksekusi; hasil belum stabil lintas modal.
+
 Bot riset trading **Binance Spot, long-only, tanpa leverage/futures**. Urutan yang dipaksa
 oleh aplikasi adalah: data → backtest → validasi rolling-window → Binance Spot Testnet
 minimal 14 hari → live. Lulus backtest **tidak** membuka live trading.
@@ -28,10 +37,14 @@ adalah sumber status gate yang sebenarnya.
 
 - Paper/live membaca saldo USDT akun secara dinamis; tidak ada hard cap 20 USDT.
 - Maksimal satu posisi, risk budget 1% dan alokasi maksimal 50% dari equity akun.
+- Untuk banyak pair, batas tersebut berlaku pada keseluruhan akun. Mode `all` dapat
+  memindai setiap pair Spot/USDT yang lolos filter, tanpa memaksa order pada semua coin.
 - Quantity juga dibatasi saldo `free`, buffer market order, `LOT_SIZE`, dan `NOTIONAL`
   Binance. Akun besar otomatis diskalakan atau dipotong ke batas exchange.
-- Setiap buy langsung diikuti OCO stop-loss 2,5% dan take-profit 5% di exchange. Jika OCO
-  gagal, posisi segera dijual market dan runtime berhenti.
+- Setiap buy langsung diikuti OCO stop-loss dan take-profit di exchange; preset baseline
+  memakai jarak 2,5% dan 5%. Jika OCO gagal, bot mencoba menjual posisi market dan berhenti.
+- Preset adaptive memakai stop berbasis ATR dan target reward/risk; intent yang hasilnya
+  belum pasti, partial fill, atau OCO terputus memerlukan rekonsiliasi sebelum restart.
 - Daily loss limit 3%, max drawdown 10%, state risiko persisten antar-restart.
 - Kill-switch CLI tidak membatalkan OCO yang sedang melindungi posisi.
 - Live memerlukan research gate, 14 hari runtime Testnet yang benar-benar tercatat,
@@ -117,6 +130,10 @@ Output: `summary.json`, `summary.csv`, `trades.csv`, `equity.csv`, dan
 
 ## 3. Validasi rolling-window
 
+Command `validate` berikut mempertahankan laporan format awal. Sejak v0.4, approval
+execution memerlukan output `research` dengan fingerprint yang cocok; file baseline
+lama hanya menjadi referensi historis.
+
 ```bash
 spotlab validate --months 24 --initial-cash 10000 --window-months 3 \
   --output reports/validation-10k
@@ -128,10 +145,14 @@ dipilih setelah membandingkan kandidat historis.
 
 ## 4. Paper trading Binance Spot Testnet
 
-Pastikan `exchange.testnet: true`, isi key Testnet di `.env`, lalu:
+Pastikan kandidat terpilih pada training, laporan `research` berstatus `RESEARCH_PASS`
+pada data terverifikasi, dan konfigurasi yang disalin cocok dengan laporan. Isi key
+Testnet di `.env`, gunakan `exchange.testnet: true`, lalu:
 
 ```bash
-spotlab paper
+spotlab --config config/validated.yaml fetch-universe
+spotlab --config config/validated.yaml research-readiness
+spotlab --config config/validated.yaml paper
 ```
 
 Biarkan berjalan minimal 14 hari **runtime aktif**. Waktu offline atau heartbeat basi
@@ -147,8 +168,8 @@ withdrawal, atau order lain yang mengunci USDT akan ikut mengubah equity akun da
 memengaruhi perhitungan daily loss/drawdown.
 
 ```bash
-spotlab readiness
-spotlab export-trades --mode paper --output reports/paper-trades.csv
+spotlab --config config/validated.yaml readiness
+spotlab --config config/validated.yaml export-trades --mode paper --output reports/paper-trades.csv
 ```
 
 ## 5. Menjalankan paper bot 24/7
@@ -168,6 +189,10 @@ kill-switch, serta batasan layanan gratis ada di
 `.env` pada server, bukan di GitHub atau image.
 
 ## 6. Live — hanya setelah paper gate lulus
+
+Modul multi-pair/adaptive v0.4 tetap dikunci dari live sambil menunggu bukti paper dan
+peninjauan lanjutan. Petunjuk di bawah hanya untuk adapter single-pair lama setelah
+seluruh gate konfigurasi tersebut lolos.
 
 Salin config, ubah hanya config live yang sudah ditinjau, dan set
 `exchange.testnet: false`. Jangan menggunakan key Testnet untuk production atau sebaliknya.

@@ -44,6 +44,15 @@ tidak membatalkan OCO exchange-side.
 
 ## Runtime container
 
+Versi 0.4 menambah `universe`, `selection`, `portfolio`, dan `research.walkforward`.
+Portofolio memakai satu kas untuk semua pair dan ranking yang sama dengan runner.
+Data riset production dan execution Testnet memakai database berbeda; jurnal akun tetap
+dibagi oleh runner single/multi untuk mempertahankan lock satu posisi.
+
+Laporan riset serta session paper diikat ke fingerprint konfigurasi. `candle_decisions`
+mencegah duplikasi lintas restart dan `execution_intents` menahan operasi yang statusnya
+belum diketahui. Durasi aktif berasal dari heartbeat terbatas dengan market data segar.
+
 Compose menjalankan satu paper worker tanpa inbound port. Root filesystem read-only;
 market cache, journal, posisi, dan kill-switch berada di named volume `/app/data`.
 Healthcheck membaca heartbeat SQLite tanpa menganggap paper gate harus sudah lulus.

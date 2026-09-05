@@ -1,7 +1,11 @@
+from spotlab.strategies.adaptive import AdaptiveTrendStrategy
 from spotlab.strategies.base import Strategy
 from spotlab.strategies.rule_based import RuleBasedStrategy
 
-STRATEGIES: dict[str, type[Strategy]] = {"rule_based_v1": RuleBasedStrategy}
+STRATEGIES: dict[str, type[Strategy]] = {
+    "rule_based_v1": RuleBasedStrategy,
+    "adaptive_trend_v2": AdaptiveTrendStrategy,
+}
 
 
 def build_strategy(name: str, **kwargs: object) -> Strategy:

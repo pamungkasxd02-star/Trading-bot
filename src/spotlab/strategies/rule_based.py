@@ -44,6 +44,7 @@ class RuleBasedStrategy(Strategy):
             }
         )
         frame["confirmation_count"] = confirmations.sum(axis=1)
+        frame["signal_score"] = frame["confirmation_count"] * 25.0
         fresh_cross = crossed_above(frame["ema_fast"], frame["ema_slow"])
         trend_ok = frame["close"].gt(frame["sma_trend"])
         frame["enter_long"] = (

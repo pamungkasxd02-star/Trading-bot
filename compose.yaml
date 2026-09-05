@@ -2,7 +2,7 @@ name: trading-bot
 
 services:
   paper:
-    image: trading-bot:0.3.0
+    image: trading-bot:0.4.0
     build:
       context: .
     init: true
@@ -16,6 +16,7 @@ services:
     volumes:
       - spotlab-data:/app/data
       - ./config:/app/config:ro
+      - ./reports:/app/reports:ro
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777

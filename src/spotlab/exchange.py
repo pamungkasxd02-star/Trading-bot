@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import suppress
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 import websockets
@@ -93,7 +93,7 @@ class BinanceRESTClient:
                 detail = error.read().decode(errors="replace")
                 if method == "GET" and error.code in {418, 429, 500, 502, 503, 504}:
                     retry_after = float(error.headers.get("Retry-After", 2**attempt))
-                    time.sleep(min(retry_after, 10))
+                    time.sleep(max(0, retry_after))
                     continue
                 raise BinanceAPIError(f"Binance HTTP {error.code}: {detail}") from error
             except (TimeoutError, URLError) as error:
@@ -106,8 +106,16 @@ class BinanceRESTClient:
     def server_time(self) -> dict[str, Any]:
         return self._request("GET", "/v3/time")
 
-    def exchange_info(self, symbol: str) -> dict[str, Any]:
-        return self._request("GET", "/v3/exchangeInfo", {"symbol": symbol.upper()})
+    def exchange_info(self, symbol: str | None = None) -> dict[str, Any]:
+        return self._request(
+            "GET", "/v3/exchangeInfo", {"symbol": symbol.upper() if symbol else None}
+        )
+
+    def tickers_24h(self) -> list[dict[str, Any]]:
+        return self._request("GET", "/v3/ticker/24hr")
+
+    def book_ticker(self, symbol: str | None = None) -> Any:
+        return self._request("GET", "/v3/ticker/bookTicker", {"symbol": symbol})
 
     def klines(
         self,
@@ -187,6 +195,82 @@ class BinanceRESTClient:
         )
 
 
+async def stream_klines(
+    symbols: list[str],
+    interval: str,
+    *,
+    testnet: bool,
+    stop_event: asyncio.Event,
+    chunk_size: int = 100,
+) -> AsyncIterator[dict[str, Any]]:
+    """Bounded combined streams; includes open updates for market liveness and marks."""
+    if not symbols or not 1 <= chunk_size <= 200:
+        raise ValueError("Symbols kosong atau chunk_size tidak valid")
+    queue: asyncio.Queue[dict[str, Any] | Exception] = asyncio.Queue(maxsize=2048)
+    base = (TESTNET_WS if testnet else PRODUCTION_WS).removesuffix("/ws")
+
+    async def consume(chunk: list[str]) -> None:
+        names = "/".join(f"{quote(s.lower(), safe='')}@kline_{interval}" for s in chunk)
+        url = f"{base}/stream?streams={names}"
+        delay = 1
+        while not stop_event.is_set():
+            try:
+                async with websockets.connect(
+                    url, ping_interval=20, ping_timeout=60, close_timeout=5, max_queue=256
+                ) as socket:
+                    delay = 1
+                    while not stop_event.is_set():
+                        raw = await asyncio.wait_for(socket.recv(), timeout=90)
+                        message = json.loads(raw)
+                        message = message.get("data", message)
+                        if message.get("e") == "serverShutdown":
+                            break
+                        kline = message.get("k")
+                        if not kline:
+                            continue
+                        await queue.put(
+                            {
+                                "symbol": str(kline["s"]),
+                                "closed": bool(kline["x"]),
+                                "open_time": int(kline["t"]),
+                                "close_time": int(kline["T"]),
+                                "open": float(kline["o"]),
+                                "high": float(kline["h"]),
+                                "low": float(kline["l"]),
+                                "close": float(kline["c"]),
+                                "volume": float(kline["v"]),
+                                "quote_volume": float(kline.get("q", 0)),
+                                "trades": int(kline.get("n", 0)),
+                            }
+                        )
+            except (TimeoutError, OSError, websockets.WebSocketException) as error:
+                LOGGER.warning("WebSocket terputus (%s); reconnect dalam %ss", error, delay)
+            except Exception as error:
+                await queue.put(error)
+                return
+            with suppress(TimeoutError):
+                await asyncio.wait_for(stop_event.wait(), timeout=delay)
+            delay = min(delay * 2, 30)
+
+    tasks = [
+        asyncio.create_task(consume(symbols[i : i + chunk_size]))
+        for i in range(0, len(symbols), chunk_size)
+    ]
+    try:
+        while not stop_event.is_set():
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=1)
+            except TimeoutError:
+                continue
+            if isinstance(item, Exception):
+                raise item
+            yield item
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
 async def stream_closed_klines(
     symbol: str,
     interval: str,
@@ -194,33 +278,6 @@ async def stream_closed_klines(
     testnet: bool,
     stop_event: asyncio.Event,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Yield only closed candles and reconnect with capped exponential backoff."""
-
-    base = TESTNET_WS if testnet else PRODUCTION_WS
-    url = f"{base}/{symbol.lower()}@kline_{interval}"
-    delay = 1
-    while not stop_event.is_set():
-        try:
-            async with websockets.connect(
-                url, ping_interval=20, ping_timeout=60, close_timeout=10, max_queue=256
-            ) as socket:
-                delay = 1
-                while not stop_event.is_set():
-                    raw = await asyncio.wait_for(socket.recv(), timeout=90)
-                    message = json.loads(raw)
-                    kline = message.get("k", {})
-                    if kline.get("x"):
-                        yield {
-                            "open_time": int(kline["t"]),
-                            "close_time": int(kline["T"]),
-                            "open": float(kline["o"]),
-                            "high": float(kline["h"]),
-                            "low": float(kline["l"]),
-                            "close": float(kline["c"]),
-                            "volume": float(kline["v"]),
-                        }
-        except (TimeoutError, OSError, websockets.WebSocketException) as error:
-            LOGGER.warning("WebSocket terputus (%s); reconnect dalam %ss", error, delay)
-            with suppress(TimeoutError):
-                await asyncio.wait_for(stop_event.wait(), timeout=delay)
-            delay = min(delay * 2, 30)
+    async for candle in stream_klines([symbol], interval, testnet=testnet, stop_event=stop_event):
+        if candle["closed"]:
+            yield candle

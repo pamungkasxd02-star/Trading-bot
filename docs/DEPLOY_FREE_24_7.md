@@ -75,15 +75,23 @@ tertimpa atau terkirim ke repository.
 
 ## 4. Jalankan
 
+Mulai v0.4, selesaikan alur di [panduan multi-pair](MULTICOIN_RESEARCH.md) dahulu dan
+salin config kandidat yang lolos ke `config/paper-server.yaml`, beserta laporan di
+`reports/research/`. Baseline v0.3 tidak otomatis meloloskan engine baru. Script start
+akan berhenti pada research preflight jika laporan belum cocok/lolos.
+
 ```bash
 ./scripts/server-start.sh
 ./scripts/server-status.sh
 ```
 
-Container akan melakukan fetch/upsert data dahulu, kemudian menjalankan `spotlab paper`.
+Script melakukan build, fetch/upsert universe, dan pemeriksaan research gate dahulu,
+kemudian menjalankan container `spotlab paper`.
 Restart policy `unless-stopped`, WebSocket reconnect, persistent position state, dan OCO
 exchange-side membuat proses dapat pulih dari reboot atau koneksi terputus. Setelah crash,
 recovery session dapat menunggu sampai heartbeat lama dinyatakan stale.
+Exception trading membuat kill-switch; intent order yang belum selesai memblokir restart
+sampai rekonsiliasi. Restart policy bukan izin untuk mengulang order yang hasilnya belum jelas.
 
 Perintah pemantauan:
 

@@ -13,7 +13,7 @@ fi
 
 case "$command_name" in
     paper)
-        spotlab --config "$config_path" fetch --months "$history_months"
+        spotlab --config "$config_path" fetch-universe --months "$history_months"
         exec spotlab --config "$config_path" paper
         ;;
     health)

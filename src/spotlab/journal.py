@@ -108,8 +108,27 @@ class TradingJournal:
                     ON equity_snapshots(mode, timestamp);
                 """
             )
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
+            if "fingerprint" not in columns:
+                connection.execute(
+                    "ALTER TABLE sessions ADD COLUMN fingerprint TEXT NOT NULL DEFAULT ''"
+                )
+            if "active_seconds" not in columns:
+                connection.execute(
+                    "ALTER TABLE sessions ADD COLUMN active_seconds REAL NOT NULL DEFAULT 0"
+                )
+            connection.executescript("""
+                CREATE TABLE IF NOT EXISTS candle_decisions (
+                    mode TEXT NOT NULL, symbol TEXT NOT NULL, interval TEXT NOT NULL,
+                    open_time INTEGER NOT NULL,
+                    PRIMARY KEY(mode, symbol, interval)
+                );
+                CREATE TABLE IF NOT EXISTS execution_intents (
+                    mode TEXT PRIMARY KEY, payload TEXT NOT NULL
+                );
+            """)
 
-    def start_session(self, mode: str, stale_seconds: int = 180) -> int:
+    def start_session(self, mode: str, stale_seconds: int = 180, fingerprint: str = "") -> int:
         now = datetime.now(UTC)
         cutoff = (now - timedelta(seconds=stale_seconds)).isoformat()
         with self._connect() as connection:
@@ -129,18 +148,21 @@ class TradingJournal:
                 raise RuntimeError(f"Session {mode} lain masih aktif (id={active['id']})")
             cursor = connection.execute(
                 """
-                INSERT INTO sessions(mode, started_at, last_heartbeat, status)
-                VALUES (?, ?, ?, 'running')
+                INSERT INTO sessions(mode, started_at, last_heartbeat, status, fingerprint)
+                VALUES (?, ?, ?, 'running', ?)
                 """,
-                (mode, now.isoformat(), now.isoformat()),
+                (mode, now.isoformat(), now.isoformat(), fingerprint),
             )
             return int(cursor.lastrowid)
 
     def heartbeat(self, session_id: int) -> None:
+        now = datetime.now(UTC).isoformat()
         with self._connect() as connection:
             cursor = connection.execute(
-                "UPDATE sessions SET last_heartbeat=? WHERE id=? AND status='running'",
-                (datetime.now(UTC).isoformat(), session_id),
+                "UPDATE sessions SET active_seconds=active_seconds + "
+                "max(0, min(60, (julianday(?) - julianday(last_heartbeat)) * 86400)), "
+                "last_heartbeat=? WHERE id=? AND status='running'",
+                (now, now, session_id),
             )
             if cursor.rowcount != 1:
                 raise RuntimeError("Session tidak aktif")
@@ -285,24 +307,22 @@ class TradingJournal:
                 (session_id, mode, symbol, *values),
             )
 
-    def paper_runtime_seconds(self) -> float:
-        now = datetime.now(UTC)
-        total = 0.0
+    def paper_runtime_seconds(self, fingerprint: str | None = None) -> float:
         with self._connect() as connection:
+            sql = "SELECT active_seconds FROM sessions WHERE mode='paper'"
             rows = connection.execute(
-                "SELECT started_at, last_heartbeat, ended_at FROM sessions WHERE mode='paper'"
+                sql + (" AND fingerprint=?" if fingerprint is not None else ""),
+                (fingerprint,) if fingerprint is not None else (),
             ).fetchall()
-        for row in rows:
-            start = datetime.fromisoformat(row["started_at"])
-            endpoint = row["ended_at"] or row["last_heartbeat"]
-            end = min(datetime.fromisoformat(endpoint), now)
-            total += max(0.0, (end - start).total_seconds())
-        return total
+        return sum(float(row["active_seconds"]) for row in rows)
 
-    def trade_rows(self, mode: str) -> list[dict[str, Any]]:
+    def trade_rows(self, mode: str, fingerprint: str | None = None) -> list[dict[str, Any]]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM trades WHERE mode=? ORDER BY exit_time", (mode,)
+                "SELECT t.* FROM trades t JOIN sessions s ON s.id=t.session_id WHERE t.mode=?"
+                + (" AND s.fingerprint=?" if fingerprint is not None else "")
+                + " ORDER BY exit_time",
+                (mode, fingerprint) if fingerprint is not None else (mode,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -334,10 +354,14 @@ class TradingJournal:
                 ),
             )
 
-    def equity_rows(self, mode: str) -> list[dict[str, Any]]:
+    def equity_rows(self, mode: str, fingerprint: str | None = None) -> list[dict[str, Any]]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM equity_snapshots WHERE mode=? ORDER BY timestamp, id", (mode,)
+                "SELECT e.* FROM equity_snapshots e JOIN sessions s ON s.id=e.session_id "
+                "WHERE e.mode=?"
+                + (" AND s.fingerprint=?" if fingerprint is not None else "")
+                + " ORDER BY timestamp, e.id",
+                (mode, fingerprint) if fingerprint is not None else (mode,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -401,3 +425,66 @@ class TradingJournal:
     def clear_position(self, mode: str) -> None:
         with self._connect() as connection:
             connection.execute("DELETE FROM positions WHERE mode=?", (mode,))
+
+    def close_recorded_position(
+        self, session_id: int, mode: str, symbol: str, trade: dict[str, Any]
+    ) -> bool:
+        """Trade PnL and position removal commit together, so crash recovery cannot double-count."""
+        columns = (
+            "entry_time",
+            "exit_time",
+            "entry_price",
+            "exit_price",
+            "quantity",
+            "gross_pnl",
+            "fees",
+            "net_pnl",
+            "return_pct",
+            "entry_reason",
+            "exit_reason",
+        )
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT symbol FROM positions WHERE mode=?", (mode,)
+            ).fetchone()
+            if row is None or row["symbol"] != symbol:
+                return False
+            connection.execute(
+                f"INSERT INTO trades(session_id, mode, symbol, {', '.join(columns)}) "
+                f"VALUES (?, ?, ?, {', '.join('?' for _ in columns)})",
+                (session_id, mode, symbol, *(trade[column] for column in columns)),
+            )
+            connection.execute("DELETE FROM positions WHERE mode=?", (mode,))
+            connection.execute("DELETE FROM execution_intents WHERE mode=?", (mode,))
+            return True
+
+    def claim_candle(self, mode: str, symbol: str, interval: str, open_time: int) -> bool:
+        """Claim before order submission: stale/duplicate signals cannot submit twice."""
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO candle_decisions VALUES (?, ?, ?, ?)
+                ON CONFLICT(mode, symbol, interval) DO UPDATE SET open_time=excluded.open_time
+                WHERE excluded.open_time > candle_decisions.open_time
+            """,
+                (mode, symbol, interval, open_time),
+            )
+            return cursor.rowcount == 1
+
+    def set_intent(self, mode: str, payload: dict[str, Any]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO execution_intents VALUES (?, ?)", (mode, json.dumps(payload))
+            )
+
+    def pending_intent(self, mode: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM execution_intents WHERE mode=?", (mode,)
+            ).fetchone()
+        return json.loads(row["payload"]) if row else None
+
+    def clear_intent(self, mode: str) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM execution_intents WHERE mode=?", (mode,))

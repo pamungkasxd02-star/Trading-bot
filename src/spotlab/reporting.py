@@ -29,13 +29,24 @@ def write_backtest_report(result: BacktestResult, output: str | Path) -> Path:
 def plot_equity(equity: pd.DataFrame, output: str | Path) -> None:
     figure, axis = plt.subplots(figsize=(10, 4.8))
     if not equity.empty:
-        axis.plot(pd.to_datetime(equity["time"]), equity["equity"], color="#16a34a", lw=1.7)
+        axis.plot(
+            pd.to_datetime(equity["time"], format="ISO8601", utc=True),
+            equity["equity"],
+            color="#16a34a",
+            lw=1.7,
+        )
     axis.set_title("Binance Spot Lab — Equity Curve")
     axis.set_xlabel("Time (UTC)")
     axis.set_ylabel("Equity (USDT)")
     axis.grid(alpha=0.25)
     figure.tight_layout()
-    figure.savefig(output, dpi=160)
+    if Path(output).suffix == ".svg":
+        with matplotlib.rc_context({"svg.hashsalt": "spotlab-equity"}):
+            figure.savefig(output, dpi=160, metadata={"Date": None})
+        path = Path(output)
+        path.write_text("\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n")
+    else:
+        figure.savefig(output, dpi=160)
     plt.close(figure)
 
 

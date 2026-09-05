@@ -1,0 +1,63 @@
+# Research/paper template. A matching RESEARCH_PASS is mandatory before orders.
+exchange:
+  symbol: BTCUSDT
+  interval: 4h
+  testnet: true
+data:
+  database: data/testnet-multicoin.db
+  research_database: data/research-multicoin.db
+  history_months: 24
+universe:
+  mode: explicit
+  symbols: [BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, LINKUSDT]
+  # mode: all scans every eligible Spot/USDT pair; null removes the scan-count cap.
+  max_symbols: 30
+  min_quote_volume: 5000000
+  max_spread_bps: 20
+  min_history_days: 180
+strategy:
+  name: adaptive_trend_v2
+  ema_fast: 20
+  ema_slow: 56
+  sma_trend: 100
+  rsi_min: 44
+  rsi_max: 70
+  min_adx: 20
+  daily_ema_period: 20
+  min_relative_volume: 0.8
+  pullback_rsi: 45
+risk:
+  stop_mode: atr
+  atr_stop_multiplier: 2
+  atr_min_stop_pct: 1
+  atr_max_stop_pct: 8
+  reward_risk_ratio: 1.5
+  stop_loss_pct: 2.5
+  take_profit_pct: 5
+  risk_per_trade_pct: 1
+  max_allocation_pct: 50
+  max_position_notional_usdt: null
+  max_open_positions: 1
+  cooldown_bars: 2
+  max_candle_participation_pct: 0.1
+  daily_loss_limit_pct: 3
+  max_drawdown_pct: 10
+backtest:
+  initial_cash: 20
+  fee_bps: 10
+  slippage_bps: 5
+research:
+  report_directory: reports/research/adaptive
+  train_months: 9
+  test_months: 3
+  min_train_trades: 10
+  min_oos_trades: 20
+  min_folds: 3
+runtime:
+  database: data/runtime.db
+  kill_switch_file: data/KILL_SWITCH
+  history_bars: 1000
+  streams_per_connection: 100
+  signal_batch_seconds: 3
+  max_signal_age_seconds: 120
+  supervision_seconds: 15

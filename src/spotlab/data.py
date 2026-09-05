@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import UTC, datetime
 from decimal import Decimal
+from math import lcm
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,7 @@ class MarketDataStore:
                     trades INTEGER NOT NULL,
                     PRIMARY KEY (symbol, interval, open_time)
                 );
+                CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, payload TEXT NOT NULL);
                 CREATE INDEX IF NOT EXISTS ix_candles_lookup
                     ON candles(symbol, interval, open_time);
                 CREATE TABLE IF NOT EXISTS symbol_rules (
@@ -89,6 +92,19 @@ class MarketDataStore:
                 rows,
             )
         return len(rows)
+
+    def set_metadata(self, key: str, payload: dict[str, Any]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO metadata VALUES (?, ?) ON CONFLICT(key) "
+                "DO UPDATE SET payload=excluded.payload",
+                (key, json.dumps(payload)),
+            )
+
+    def metadata(self, key: str) -> dict[str, Any]:
+        with self._connect() as connection:
+            row = connection.execute("SELECT payload FROM metadata WHERE key=?", (key,)).fetchone()
+        return json.loads(row["payload"]) if row else {}
 
     def upsert_closed_candle(self, symbol: str, interval: str, candle: dict[str, Any]) -> None:
         synthetic = [
@@ -171,21 +187,35 @@ class MarketDataStore:
 
 
 def parse_symbol_rules(info: dict[str, Any], symbol: str) -> SymbolRules:
-    symbols = info.get("symbols", [])
+    symbols = [
+        item
+        for item in info.get("symbols", [])
+        if item.get("symbol", symbol.upper()) == symbol.upper()
+    ]
     if not symbols:
         raise RuntimeError(f"Symbol {symbol} tidak ditemukan di exchangeInfo")
     filters = {item["filterType"]: item for item in symbols[0]["filters"]}
     lot = filters["LOT_SIZE"]
+    market_lot = filters.get("MARKET_LOT_SIZE", {})
     price = filters["PRICE_FILTER"]
     notional = filters.get("NOTIONAL") or filters.get("MIN_NOTIONAL")
     if notional is None:
         raise RuntimeError("Exchange tidak mengembalikan filter NOTIONAL/MIN_NOTIONAL")
     raw_max_notional = Decimal(str(notional.get("maxNotional", "0")))
+    step = Decimal(lot["stepSize"])
+    market_step = Decimal(market_lot.get("stepSize", "0"))
+    if market_step > 0:
+        scale = Decimal(10) ** max(-step.as_tuple().exponent, -market_step.as_tuple().exponent, 0)
+        step = Decimal(lcm(int(step * scale), int(market_step * scale))) / scale
+    maximums = [Decimal(lot["maxQty"])]
+    market_max = Decimal(market_lot.get("maxQty", "0"))
+    if market_max > 0:
+        maximums.append(market_max)
     return SymbolRules(
         symbol=symbol.upper(),
-        min_qty=Decimal(lot["minQty"]),
-        max_qty=Decimal(lot["maxQty"]),
-        step_size=Decimal(lot["stepSize"]),
+        min_qty=max(Decimal(lot["minQty"]), Decimal(market_lot.get("minQty", "0"))),
+        max_qty=min(maximums),
+        step_size=step,
         tick_size=Decimal(price["tickSize"]),
         min_notional=Decimal(notional["minNotional"]),
         max_notional=raw_max_notional if raw_max_notional > 0 else None,
@@ -207,7 +237,10 @@ def fetch_history(
         batch = client.klines(symbol, interval, start_time=cursor, end_time=end_ms, limit=1000)
         if not batch:
             break
-        total += store.upsert_klines(symbol, interval, batch)
+        # Never cache an incomplete candle as if it were historical evidence.
+        total += store.upsert_klines(
+            symbol, interval, [row for row in batch if int(row[6]) < end_ms]
+        )
         next_cursor = int(batch[-1][0]) + 1
         if next_cursor <= cursor:
             raise RuntimeError("Pagination Binance tidak maju")

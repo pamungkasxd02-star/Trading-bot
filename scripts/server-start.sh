@@ -30,6 +30,9 @@ else
   exit 1
 fi
 
-"${docker_cmd[@]}" compose up --detach --build paper
+"${docker_cmd[@]}" compose build paper
+"${docker_cmd[@]}" compose run --rm --no-deps paper fetch-universe
+"${docker_cmd[@]}" compose run --rm --no-deps paper research-readiness
+"${docker_cmd[@]}" compose up --detach paper
 "${docker_cmd[@]}" compose ps
 echo "Paper bot dimulai. Pantau dengan ./scripts/server-status.sh"

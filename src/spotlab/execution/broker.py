@@ -92,16 +92,27 @@ class BinanceBroker:
         estimated = float(order.get("cummulativeQuoteQty", 0)) * self.fee_rate
         base_commission = Decimal("0")
         quote_fee = 0.0
-        saw_quote = False
+        saw_fee = False
         for fill in order.get("fills", []):
             commission = Decimal(str(fill.get("commission", "0")))
             asset = str(fill.get("commissionAsset", ""))
+            saw_fee = saw_fee or "commission" in fill
             if asset == base_asset:
                 base_commission += commission
-            elif asset and asset != base_asset:
+                quote_fee += float(commission) * float(fill["price"])
+                saw_fee = True
+            elif asset == "USDT":
                 quote_fee += float(commission)
-                saw_quote = True
-        return (quote_fee if saw_quote else estimated), base_commission
+                saw_fee = True
+            elif asset and commission:
+                try:
+                    book = self.client.book_ticker(f"{asset}USDT")
+                    quote_fee += float(commission) * float(book["askPrice"])
+                except (BinanceAPIError, KeyError, ValueError):
+                    # Fee conversion must never interrupt OCO placement after a buy.
+                    return max(estimated, quote_fee), base_commission
+                saw_fee = True
+        return (quote_fee if saw_fee else estimated), base_commission
 
     def enter(
         self,
@@ -113,6 +124,7 @@ class BinanceBroker:
         take_profit_price: Decimal,
         entry_time: str,
         reason: str,
+        client_order_id: str | None = None,
     ) -> tuple[ManagedPosition, list[dict[str, Any]]]:
         entry = self.client.order(
             symbol=symbol,
@@ -120,6 +132,7 @@ class BinanceBroker:
             type="MARKET",
             quantity=decimal_string(quantity),
             newOrderRespType="FULL",
+            newClientOrderId=client_order_id,
         )
         executed = Decimal(str(entry.get("executedQty", "0")))
         quote = Decimal(str(entry.get("cummulativeQuoteQty", "0")))
@@ -166,21 +179,33 @@ class BinanceBroker:
         return position, [entry, protection]
 
     def poll_exit(self, position: ManagedPosition) -> ExitExecution | None:
+        statuses = []
         for order_id in position.protection_order_ids:
             order = self.client.query_order(position.symbol, order_id)
+            statuses.append(order.get("status"))
+            if order.get("status") == "PARTIALLY_FILLED":
+                raise BinanceAPIError("OCO partial fill; hentikan dan rekonsiliasi quantity/fee")
             if order.get("status") == "FILLED":
                 quantity = float(order["executedQty"])
                 quote = float(order["cummulativeQuoteQty"])
                 price = quote / quantity
+                fills = self.client.my_trades(position.symbol, order_id)
+                fee, _ = self._quote_fee(
+                    {**order, "fills": fills}, position.symbol.removesuffix("USDT")
+                )
                 return ExitExecution(
                     exit_time=str(order.get("updateTime", order.get("transactTime", ""))),
                     price=price,
                     quantity=quantity,
-                    fee_quote=quote * self.fee_rate,
+                    fee_quote=fee,
                     order_id=str(order["orderId"]),
                     reason="exchange_protection_fill",
                     payload=order,
                 )
+        if not all(status in {"NEW", "PENDING_NEW"} for status in statuses):
+            raise BinanceAPIError(
+                "OCO dibatalkan/expired tanpa fill; rekonsiliasi posisi diperlukan"
+            )
         return None
 
     def exit_market(self, position: ManagedPosition, reason: str) -> ExitExecution:
@@ -200,11 +225,14 @@ class BinanceBroker:
         )
         quantity = float(order["executedQty"])
         quote = float(order["cummulativeQuoteQty"])
+        if order.get("status") != "FILLED" or quantity < position.quantity * 0.999999:
+            raise BinanceAPIError("Market exit belum filled penuh; rekonsiliasi diperlukan")
+        fee, _ = self._quote_fee(order, position.symbol.removesuffix("USDT"))
         return ExitExecution(
             exit_time=str(order.get("transactTime", "")),
             price=quote / quantity,
             quantity=quantity,
-            fee_quote=quote * self.fee_rate,
+            fee_quote=fee,
             order_id=str(order["orderId"]),
             reason=reason,
             payload=order,
