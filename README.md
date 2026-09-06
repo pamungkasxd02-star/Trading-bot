@@ -6,6 +6,9 @@ quote bid/ask, sinyal, order simulasi, PnL, dan equity ke `data/learning.db`.
 Tidak memerlukan API key. Ini akun internal untuk belajar, bukan akun Binance/Testnet;
 tidak memberi approval paper/live dan tidak otomatis melatih ML.
 Lihat [panduan akun demo](docs/LEARNING_DEMO.md).
+Untuk **scalping demo**, jalankan `bash scripts/scalping-demo.sh`: candle 1m,
+EMA 9/21, quote 5 detik, dan batas hold 15 menit. Akun serta datanya terpisah;
+strategi cepat ini masih eksperimen, bukan janji WR tinggi.
 
 **v0.5:** tersedia setup otomatis **GitHub Codespaces**, replay demo tanpa API key,
 enam kandidat strategi termasuk pemisahan tren/range, serta seleksi dan stress biaya

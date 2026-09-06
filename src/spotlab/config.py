@@ -184,6 +184,7 @@ class DemoConfig(StrictModel):
     interval: Literal["1m", "3m", "5m", "15m", "30m", "1h", "4h"] = "1m"
     warmup_bars: int = Field(500, ge=200, le=5000)
     quote_seconds: int = Field(15, ge=5, le=60)
+    max_hold_seconds: int | None = Field(None, ge=30, le=86400)
     repair_seconds: int = Field(300, ge=60, le=3600)
     kill_switch_file: Path = Path("data/DEMO_STOP_TRADING")
 

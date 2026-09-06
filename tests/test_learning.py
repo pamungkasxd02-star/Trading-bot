@@ -198,3 +198,22 @@ def test_demo_cli_never_loads_exchange_secrets(tmp_path, monkeypatch, capsys):
     cli.main(["--config", str(config_file), "demo-init"])
     assert json.loads(capsys.readouterr().out)["cash"] == 2500
     assert not (tmp_path / "data/runtime.db").exists()
+
+
+def test_scalping_exits_at_time_limit_with_costs(demo):
+    account, engine = demo
+    account.config.demo.max_hold_seconds = 900
+    engine.signal("BTCUSDT", entry_row())
+    engine.quotes(quote())
+    with account.edit() as (_, state):
+        state["position"]["entry_time"] = pd.Timestamp(
+            time.time() - 901, unit="s", tz="UTC"
+        ).isoformat()
+    engine.quotes(quote())
+    assert account.status()["position"] is None
+    assert account.status()["realized_pnl"] < 0  # flat price is still a loss after costs
+    with account.connect() as conn:
+        trade = json.loads(
+            conn.execute("SELECT payload FROM demo_records WHERE kind='trade'").fetchone()[0]
+        )
+    assert trade["exit_reason"] == "max_hold_time"

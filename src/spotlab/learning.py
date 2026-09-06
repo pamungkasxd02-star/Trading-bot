@@ -48,6 +48,7 @@ def fingerprint(config: AppConfig) -> str:
         "symbol": config.exchange.symbol,
         "warmup": config.demo.warmup_bars,
         "quote_seconds": config.demo.quote_seconds,
+        "max_hold_seconds": config.demo.max_hold_seconds,
         "max_signal_age": config.runtime.max_signal_age_seconds,
         "max_signal_drift": config.runtime.max_signal_price_drift_bps,
     }
@@ -348,6 +349,11 @@ class DemoEngine:
                     bid = position["take_profit_price"]
                 elif pending.get(position["symbol"], {}).get("exit_long"):
                     reason = "strategy_exit"
+                elif self.config.demo.max_hold_seconds is not None and (
+                    now - datetime.fromisoformat(position["entry_time"]).timestamp()
+                    >= self.config.demo.max_hold_seconds
+                ):
+                    reason = "max_hold_time"
                 if reason:
                     price = bid * (1 - self.slip)
                     qty = position["quantity"]

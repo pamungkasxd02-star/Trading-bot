@@ -2,6 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Trading bot: scalping demo (1m, virtual)",
+      "type": "shell",
+      "command": "bash scripts/scalping-demo.sh",
+      "problemMatcher": []
+    },
+    {
       "label": "Trading bot: start learning account (real-time virtual)",
       "type": "shell",
       "command": "bash scripts/learning-demo.sh",

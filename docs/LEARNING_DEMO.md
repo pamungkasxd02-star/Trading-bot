@@ -55,6 +55,26 @@ Preset satu menit adalah alat belajar; hasil backtest empat jam tidak berlaku ot
 
 ## Saldo lain, berhenti, dan daya tahan data
 
+### Mode scalping cepat (demo)
+
+```bash
+bash scripts/scalping-demo.sh
+# Terminal lain:
+.venv/bin/python -m spotlab --config config/scalping-demo.yaml demo-status
+.venv/bin/python -m spotlab --config config/scalping-demo.yaml demo-export --output reports/scalping-learning
+```
+
+Akun **Scalping Belajar** memakai database `data/learning-scalping.db` sendiri:
+candle 1 menit, EMA 9/21, SMA 50, filter RSI/MACD/Bollinger/volume, dan quote tiap
+5 detik. Exit pada SL 0,6%, TP 1,2%, sinyal exit, atau umur posisi 15 menit,
+mana yang teramati lebih dahulu. Risiko 0,25% equity per trade, alokasi maksimal
+25%, satu posisi, cooldown dua candle. Entry masih menunggu sinyal; tidak dipaksa
+setiap menit. Fee dan slippage default bersama-sama sekitar 0,3% pulang-pergi,
+belum termasuk spread, sehingga frekuensi tinggi bisa memperbesar kerugian.
+Mode ini bukan HFT dan belum lulus backtest khusus scalping. Ia tidak membuka live.
+
+### Akun dan penghentian
+
 ```bash
 # Hanya ketika akun pada database ini belum dibuat:
 .venv/bin/python -m spotlab --config config/demo.yaml demo-init --initial-cash 10000
