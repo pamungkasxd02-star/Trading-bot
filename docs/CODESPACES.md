@@ -73,3 +73,9 @@ tidak menyalakan Codespace dan tidak menjalankan paper bot 24/7.
 Referensi: [billing Codespaces](https://docs.github.com/billing/managing-billing-for-github-codespaces/about-billing-for-github-codespaces),
 [timeout idle](https://docs.github.com/en/codespaces/setting-your-user-preferences/setting-your-timeout-period-for-github-codespaces),
 [spesifikasi dev container](https://containers.dev/implementors/json_reference/).
+# Akun demo belajar real-time
+
+Setelah setup, jalankan `bash scripts/learning-demo.sh` untuk mengumpulkan data
+pasar dan mensimulasikan transaksi dengan saldo virtual yang persisten.
+Panduan saldo, statistik, export, dan batasan: [LEARNING_DEMO.md](LEARNING_DEMO.md).
+Demo historis otomatis di bawah ini tetap tersedia untuk reproduksi backtest.

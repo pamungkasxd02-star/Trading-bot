@@ -2,6 +2,19 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Trading bot: start learning account (real-time virtual)",
+      "type": "shell",
+      "command": "bash scripts/learning-demo.sh",
+      "problemMatcher": []
+    },
+    {
+      "label": "Trading bot: learning account status",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "spotlab", "--config", "config/demo.yaml", "demo-status"],
+      "problemMatcher": []
+    },
+    {
       "label": "Trading bot: historical demo",
       "type": "shell",
       "command": "bash scripts/codespaces-demo.sh",

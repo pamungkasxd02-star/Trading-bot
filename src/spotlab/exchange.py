@@ -21,6 +21,8 @@ PRODUCTION_REST = "https://api.binance.com/api"
 TESTNET_REST = "https://testnet.binance.vision/api"
 PRODUCTION_WS = "wss://stream.binance.com:9443/ws"
 TESTNET_WS = "wss://stream.testnet.binance.vision/ws"
+MARKET_DATA_REST = "https://data-api.binance.vision/api"
+MARKET_DATA_WS = "wss://data-stream.binance.vision:443/ws"
 
 
 class BinanceAPIError(RuntimeError):
@@ -195,6 +197,31 @@ class BinanceRESTClient:
         )
 
 
+class PublicMarketClient(BinanceRESTClient):
+    """Credentials are never loaded; only allow-listed public GETs can leave this client."""
+
+    def __init__(self, *, timeout: int = 15) -> None:
+        super().__init__(timeout=timeout)
+        self.base_url = MARKET_DATA_REST
+
+    def _request(self, method, path, params=None, *, signed=False):
+        if (
+            method != "GET"
+            or signed
+            or path
+            not in {
+                "/v3/klines",
+                "/v3/exchangeInfo",
+                "/v3/ticker/24hr",
+                "/v3/ticker/bookTicker",
+            }
+        ):
+            raise BinanceAPIError("Demo client only permits public market data GETs")
+        if self.api_key or self.api_secret or self.base_url != MARKET_DATA_REST:
+            raise BinanceAPIError("Demo transport must remain credential-free and data-only")
+        return super()._request(method, path, params)
+
+
 async def stream_klines(
     symbols: list[str],
     interval: str,
@@ -202,12 +229,15 @@ async def stream_klines(
     testnet: bool,
     stop_event: asyncio.Event,
     chunk_size: int = 100,
+    market_data_only: bool = False,
 ) -> AsyncIterator[dict[str, Any]]:
     """Bounded combined streams; includes open updates for market liveness and marks."""
     if not symbols or not 1 <= chunk_size <= 200:
         raise ValueError("Symbols kosong atau chunk_size tidak valid")
     queue: asyncio.Queue[dict[str, Any] | Exception] = asyncio.Queue(maxsize=2048)
     base = (TESTNET_WS if testnet else PRODUCTION_WS).removesuffix("/ws")
+    if market_data_only:
+        base = MARKET_DATA_WS.removesuffix("/ws")
 
     async def consume(chunk: list[str]) -> None:
         names = "/".join(f"{quote(s.lower(), safe='')}@kline_{interval}" for s in chunk)

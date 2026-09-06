@@ -34,6 +34,16 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--config", default="config/default.yaml")
     root.add_argument("--verbose", action="store_true")
     commands = root.add_subparsers(dest="command", required=True)
+    demo_init = commands.add_parser("demo-init", help="Buat akun belajar virtual tanpa API key")
+    demo_init.add_argument("--initial-cash", type=float)
+    demo_run = commands.add_parser("demo-run", help="Kumpulkan data publik + simulasi forward")
+    demo_run.add_argument("--duration-seconds", type=int)
+    commands.add_parser("demo-status", help="Saldo virtual, posisi, data, dan statistik demo")
+    commands.add_parser(
+        "demo-stop-trading", help="Hentikan trading virtual; data tetap dikumpulkan"
+    )
+    demo_export = commands.add_parser("demo-export", help="Export data belajar + backup SQLite")
+    demo_export.add_argument("--output", default="reports/learning")
 
     fetch = commands.add_parser("fetch", help="Fetch dan cache OHLCV + exchange filters")
     fetch.add_argument("--months", type=int)
@@ -192,6 +202,26 @@ def main(argv: list[str] | None = None) -> None:
 
 def _dispatch(args: argparse.Namespace) -> None:
     config = load_config(args.config)
+    if args.command.startswith("demo-"):
+        from spotlab.learning import DemoAccount, run_demo
+
+        # Do not load .env credentials or create paper/live journals for learning commands.
+        account = DemoAccount(config)
+        if args.command == "demo-init":
+            print(json.dumps(account.initialize(args.initial_cash), indent=2))
+        elif args.command == "demo-run":
+            if args.duration_seconds is not None and args.duration_seconds <= 0:
+                raise ValueError("duration-seconds harus positif")
+            asyncio.run(run_demo(config, duration_seconds=args.duration_seconds))
+        elif args.command == "demo-status":
+            print(json.dumps(account.status(), indent=2))
+        elif args.command == "demo-export":
+            print(account.export(args.output).resolve())
+        else:
+            config.demo.kill_switch_file.parent.mkdir(parents=True, exist_ok=True)
+            config.demo.kill_switch_file.touch()
+            print("Trading virtual dihentikan pada quote berikutnya; collector tetap berjalan")
+        return
     secrets = Secrets()
     store = MarketDataStore(config.data.database)
     journal = TradingJournal(config.runtime.database)

@@ -177,6 +177,17 @@ class RuntimeConfig(StrictModel):
     supervision_seconds: int = Field(15, ge=5, le=30)
 
 
+class DemoConfig(StrictModel):
+    database: Path = Path("data/learning.db")
+    name: str = Field("Belajar", min_length=1, max_length=60)
+    initial_cash: float = Field(1000, gt=0)
+    interval: Literal["1m", "3m", "5m", "15m", "30m", "1h", "4h"] = "1m"
+    warmup_bars: int = Field(500, ge=200, le=5000)
+    quote_seconds: int = Field(15, ge=5, le=60)
+    repair_seconds: int = Field(300, ge=60, le=3600)
+    kill_switch_file: Path = Path("data/DEMO_STOP_TRADING")
+
+
 class AppConfig(StrictModel):
     exchange: ExchangeConfig = ExchangeConfig()
     data: DataConfig = DataConfig()
@@ -187,11 +198,18 @@ class AppConfig(StrictModel):
     gates: GatesConfig = GatesConfig()
     runtime: RuntimeConfig = RuntimeConfig()
     research: ResearchConfig = ResearchConfig()
+    demo: DemoConfig = DemoConfig()
 
     @model_validator(mode="after")
     def validate_storage(self) -> AppConfig:
         if self.data.database == self.data.research_database:
             raise ValueError("Database riset dan execution harus terpisah")
+        if self.demo.database.resolve() in {
+            self.data.database.resolve(),
+            self.data.research_database.resolve(),
+            self.runtime.database.resolve(),
+        }:
+            raise ValueError("Database demo harus terpisah dari database riset/execution")
         return self
 
 
@@ -212,6 +230,8 @@ def _resolve_paths(config: AppConfig, base: Path) -> AppConfig:
         ("research", "report_directory"),
         ("runtime", "database"),
         ("runtime", "kill_switch_file"),
+        ("demo", "database"),
+        ("demo", "kill_switch_file"),
     ):
         path = Path(data[section][key])
         data[section][key] = path if path.is_absolute() else base / path

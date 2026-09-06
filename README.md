@@ -1,5 +1,12 @@
 # Binance Spot Lab — modal dinamis (baseline 20 USDT)
 
+**Akun demo belajar real-time:** jalankan `bash scripts/learning-demo.sh` di Codespaces.
+Bot membuat saldo virtual 1.000 USDT (bisa diganti), menyimpan candle satu menit,
+quote bid/ask, sinyal, order simulasi, PnL, dan equity ke `data/learning.db`.
+Tidak memerlukan API key. Ini akun internal untuk belajar, bukan akun Binance/Testnet;
+tidak memberi approval paper/live dan tidak otomatis melatih ML.
+Lihat [panduan akun demo](docs/LEARNING_DEMO.md).
+
 **v0.5:** tersedia setup otomatis **GitHub Codespaces**, replay demo tanpa API key,
 enam kandidat strategi termasuk pemisahan tren/range, serta seleksi dan stress biaya
 pada tiga modal. Target riset WR 55% **belum tercapai**; kandidat baru belum membuktikan
