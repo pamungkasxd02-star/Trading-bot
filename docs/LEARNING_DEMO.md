@@ -73,6 +73,27 @@ setiap menit. Fee dan slippage default bersama-sama sekitar 0,3% pulang-pergi,
 belum termasuk spread, sehingga frekuensi tinggi bisa memperbesar kerugian.
 Mode ini bukan HFT dan belum lulus backtest khusus scalping. Ia tidak membuka live.
 
+### Periksa kesehatan real-time
+
+```bash
+.venv/bin/python -m spotlab --config config/scalping-demo.yaml demo-health
+```
+
+Exit code 0 berarti proses hidup dan seluruh pair terpilih mempunyai quote serta
+keputusan candle yang masih segar, tanpa gangguan REST yang belum pulih. Exit code
+2 berarti offline/degraded; baca `symbol_health` dan `connections` di JSON.
+Batas quote adalah maksimal 15 detik atau tiga interval polling; batas keputusan
+adalah satu interval candle ditambah toleransi 15 detik. Ini pemeriksaan operasional,
+bukan bukti profit atau izin live. `trading_halted` menunjukkan kill-switch/risk halt
+secara terpisah; collector sehat masih bisa menghentikan trading virtual.
+
+Quote dengan waktu respons lebih lama dari interval polling dibuang. Gangguan REST
+quote memakai jeda retry bertahap sampai 60 detik, selain retry HTTP bawaan client.
+Event awal gangguan dan pemulihannya disimpan tanpa menulis event berulang setiap
+polling. Error internal engine/lease menghentikan proses agar tidak tersamar sebagai
+gangguan jaringan. Health tidak mengubah aturan entry: tiap entry tetap memerlukan
+sinyal segar dan quote valid coin tersebut; gangguan coin lain terlihat pada health.
+
 ### Akun dan penghentian
 
 ```bash

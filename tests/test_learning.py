@@ -238,3 +238,77 @@ def test_account_closes_sqlite_connection_after_transaction(demo):
         conn.execute("SELECT 1")
     with pytest.raises(sqlite3.ProgrammingError, match="closed"):
         conn.execute("SELECT 1")
+
+
+def test_health_requires_fresh_data_for_every_selected_symbol(demo):
+    account, engine = demo
+    account.market.set_metadata("learning_source", {"symbols": ["BTCUSDT", "ETHUSDT"]})
+    engine.signal("BTCUSDT", entry_row(enter_long=False))
+    engine.quotes(quote())
+    status = account.status()
+    assert status["process_alive"] is True
+    assert status["health"] == "degraded"
+    assert status["symbol_health"]["BTCUSDT"]["fresh"] is True
+    assert status["symbol_health"]["ETHUSDT"]["fresh"] is False
+    with account.edit() as (_, state):
+        state["quote_times"]["ETHUSDT"] = time.time()
+        state["decisions"]["ETHUSDT"] = int((time.time() - 2) * 1000)
+    assert account.status()["health"] == "healthy"
+    with account.edit() as (_, state):
+        state["quote_times"]["BTCUSDT"] -= 120
+    assert account.status()["health"] == "degraded"
+
+
+def test_health_does_not_confuse_fresh_quotes_with_fresh_strategy(demo):
+    account, engine = demo
+    engine.signal("BTCUSDT", entry_row(enter_long=False))
+    engine.quotes(quote())
+    assert account.status()["health"] == "healthy"
+    with account.edit() as (_, state):
+        state["decisions"]["BTCUSDT"] -= 3600000
+    assert account.status()["health"] == "degraded"
+    account.stop()
+    assert account.status()["health"] == "offline"
+
+
+def test_connection_outage_and_recovery_are_persisted_without_event_spam(demo):
+    account, engine = demo
+    engine.signal("BTCUSDT", entry_row(enter_long=False))
+    engine.quotes(quote())
+    account.connection_result("quotes", "timeout")
+    account.connection_result("quotes", "timeout")
+    status = account.status()
+    assert status["health"] == "degraded"
+    assert status["connections"]["quotes"]["consecutive_failures"] == 2
+    assert status["records"]["event"] == 1
+    account.connection_result("quotes")
+    account.connection_result("quotes")
+    assert account.status()["health"] == "healthy"
+    assert account.status()["records"]["event"] == 2
+    assert DemoAccount(account.config).status()["connections"]["quotes"]["last_success_at"]
+
+
+def test_market_store_closes_connection(demo):
+    import sqlite3
+
+    account, _ = demo
+    with account.market._connect() as conn:
+        conn.execute("SELECT 1")
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        conn.execute("SELECT 1")
+
+
+def test_cli_health_returns_failure_when_collector_is_offline(demo, monkeypatch, capsys):
+    from spotlab import cli
+
+    account, engine = demo
+    monkeypatch.setattr(cli, "load_config", lambda _: account.config)
+    engine.signal("BTCUSDT", entry_row(enter_long=False))
+    engine.quotes(quote())
+    cli.main(["demo-health"])
+    assert json.loads(capsys.readouterr().out)["health"] == "healthy"
+    account.stop()
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["demo-health"])
+    assert exc.value.code == 2
+    assert json.loads(capsys.readouterr().out)["health"] == "offline"

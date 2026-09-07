@@ -39,6 +39,7 @@ def parser() -> argparse.ArgumentParser:
     demo_run = commands.add_parser("demo-run", help="Kumpulkan data publik + simulasi forward")
     demo_run.add_argument("--duration-seconds", type=int)
     commands.add_parser("demo-status", help="Saldo virtual, posisi, data, dan statistik demo")
+    commands.add_parser("demo-health", help="Status data real-time; exit 2 jika stale/offline")
     commands.add_parser(
         "demo-stop-trading", help="Hentikan trading virtual; data tetap dikumpulkan"
     )
@@ -213,8 +214,11 @@ def _dispatch(args: argparse.Namespace) -> None:
             if args.duration_seconds is not None and args.duration_seconds <= 0:
                 raise ValueError("duration-seconds harus positif")
             asyncio.run(run_demo(config, duration_seconds=args.duration_seconds))
-        elif args.command == "demo-status":
-            print(json.dumps(account.status(), indent=2))
+        elif args.command in {"demo-status", "demo-health"}:
+            status = account.status()
+            print(json.dumps(status, indent=2))
+            if args.command == "demo-health" and status["health"] != "healthy":
+                raise SystemExit(2)
         elif args.command == "demo-export":
             print(account.export(args.output).resolve())
         else:

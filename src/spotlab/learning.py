@@ -23,7 +23,7 @@ import pandas as pd
 
 from spotlab.config import AppConfig
 from spotlab.data import MarketDataStore, fetch_history, parse_symbol_rules
-from spotlab.exchange import MARKET_DATA_REST, PublicMarketClient, stream_klines
+from spotlab.exchange import MARKET_DATA_REST, BinanceAPIError, PublicMarketClient, stream_klines
 from spotlab.quality import interval_milliseconds
 from spotlab.risk import RiskManager, RiskViolation
 from spotlab.selection import ranked_entries
@@ -164,6 +164,25 @@ class DemoAccount:
         with self.edit():
             pass
 
+    def connection_result(self, channel: str, error: str | None = None):
+        """Persist outages and recoveries without flooding the event log each poll."""
+        with self.edit() as (conn, state):
+            channels = state.setdefault("connections", {})
+            previous = channels.get(channel, {})
+            failures = previous.get("consecutive_failures", 0)
+            current = {**previous, "checked_at": timestamp()}
+            if error is not None:
+                current.update(consecutive_failures=failures + 1, last_error=error[:500])
+                if not failures:
+                    self.record(conn, "event", "", {"event": "connection_lost", "channel": channel})
+            else:
+                current.update(consecutive_failures=0, last_success_at=timestamp())
+                if failures:
+                    self.record(
+                        conn, "event", "", {"event": "connection_restored", "channel": channel}
+                    )
+            channels[channel] = current
+
     def stop(self):
         with self.edit() as (conn, state):
             state.update(status="stopped", pending={})
@@ -187,14 +206,45 @@ class DemoAccount:
         pnl = [t["net_pnl"] for t in trades]
         wins, losses = [p for p in pnl if p > 0], [p for p in pnl if p < 0]
         state.pop("pending")
-        state.pop("decisions")
+        decisions = state.pop("decisions")
+        now = time.time()
+        alive = bool(row["owner"]) and 0 <= now - row["heartbeat"] < 180
+        symbols = self.market.metadata("learning_source").get("symbols", [])
+        symbols = sorted(set(symbols) | set(state["quote_times"]) | set(decisions))
+        quote_limit = max(15, self.config.demo.quote_seconds * 3)
+        candle_limit = interval_milliseconds(self.config.demo.interval) / 1000 + 15
+        per_symbol = {}
+        for symbol in symbols:
+            quote_time = state["quote_times"].get(symbol)
+            decision_time = decisions.get(symbol)
+            q_age = now - quote_time if quote_time else None
+            c_age = now - decision_time / 1000 if decision_time else None
+            per_symbol[symbol] = {
+                "quote_age_seconds": q_age,
+                "decision_age_seconds": c_age,
+                "fresh": q_age is not None
+                and c_age is not None
+                and 0 <= q_age <= quote_limit
+                and 0 <= c_age <= candle_limit,
+            }
+        fresh = bool(per_symbol) and all(s["fresh"] for s in per_symbol.values())
+        connection_failed = any(
+            c.get("consecutive_failures", 0) for c in state.get("connections", {}).values()
+        )
+        health = (
+            "offline" if not alive else "healthy" if fresh and not connection_failed else "degraded"
+        )
         quote_age = (
             (datetime.now(UTC) - datetime.fromisoformat(state["quote_received_at"])).total_seconds()
             if state["quote_received_at"]
             else None
         )
         state.update(
-            process_alive=bool(row["owner"]) and time.time() - row["heartbeat"] < 180,
+            process_alive=alive,
+            health=health,
+            market_data_fresh=fresh,
+            symbol_health=per_symbol,
+            trading_halted=bool(state["halt_reason"]) or self.config.demo.kill_switch_file.exists(),
             quote_age_seconds=quote_age,
             candles=candles,
             records=counts,
@@ -596,15 +646,23 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
                     engine.closed_candle(candle["symbol"], candle)
 
         async def quote_loop():
+            failures = 0
             while not stop.is_set():
                 try:
                     started = time.monotonic()
                     books = await asyncio.to_thread(client.book_ticker)
-                    if time.monotonic() - started <= config.demo.quote_seconds:
-                        engine.quotes(books)
-                except RuntimeError as exc:
+                    if time.monotonic() - started > config.demo.quote_seconds:
+                        raise BinanceAPIError("Quote response too slow; discarded")
+                except BinanceAPIError as exc:
+                    failures += 1
+                    account.connection_result("quotes", str(exc))
                     LOGGER.warning("Public quote unavailable: %s", exc)
-                await pause(config.demo.quote_seconds)
+                else:
+                    # Engine/lease errors are fatal, never swallowed as network errors.
+                    engine.quotes(books)
+                    account.connection_result("quotes")
+                    failures = 0
+                await pause(min(60, config.demo.quote_seconds * 2 ** min(failures, 4)))
 
         async def repair_loop():
             while not stop.is_set():
@@ -613,10 +671,13 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
                     break
                 try:
                     await asyncio.to_thread(repair)
+                except BinanceAPIError as exc:
+                    account.connection_result("backfill", str(exc))
+                    LOGGER.warning("Candle backfill unavailable: %s", exc)
+                else:
                     for symbol in symbols:
                         engine.latest_signal(symbol)
-                except RuntimeError as exc:
-                    LOGGER.warning("Candle backfill unavailable: %s", exc)
+                    account.connection_result("backfill")
 
         tasks.extend(
             asyncio.create_task(guard(c)) for c in (collect(), quote_loop(), repair_loop())
