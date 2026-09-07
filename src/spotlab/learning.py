@@ -74,10 +74,15 @@ class DemoAccount:
                 CREATE INDEX IF NOT EXISTS demo_kind ON demo_records(kind, id);
             """)
 
+    @contextmanager
     def connect(self):
         conn = sqlite3.connect(self.database, timeout=30)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def initialize(self, initial_cash: float | None = None):
         amount = self.config.demo.initial_cash if initial_cash is None else initial_cash
@@ -276,7 +281,9 @@ class DemoEngine:
         self.latest_signal(symbol)
 
     def latest_signal(self, symbol):
-        frame = self.account.market.load_candles(symbol, self.config.demo.interval)
+        frame = self.account.market.load_candles(
+            symbol, self.config.demo.interval, limit=self.config.demo.warmup_bars
+        )
         if len(frame) >= self.config.demo.warmup_bars:
             # Missing recent bars invalidate signals, but remain visible in the dataset.
             frame = frame.tail(self.config.demo.warmup_bars)
@@ -551,7 +558,7 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
         def repair():
             end = datetime.now(UTC)
             for symbol in symbols:
-                frame = account.market.load_candles(symbol, config.demo.interval)
+                frame = account.market.load_candles(symbol, config.demo.interval, limit=1)
                 start = pd.Timestamp(end) - pd.Timedelta(
                     interval_milliseconds(config.demo.interval) * (config.demo.warmup_bars + 2),
                     unit="ms",

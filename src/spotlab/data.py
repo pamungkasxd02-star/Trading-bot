@@ -126,6 +126,8 @@ class MarketDataStore:
         interval: str,
         start: datetime | None = None,
         end: datetime | None = None,
+        *,
+        limit: int | None = None,
     ) -> pd.DataFrame:
         clauses = ["symbol = ?", "interval = ?"]
         params: list[Any] = [symbol.upper(), interval]
@@ -135,10 +137,17 @@ class MarketDataStore:
         if end:
             clauses.append("open_time <= ?")
             params.append(int(end.timestamp() * 1000))
-        query = f"SELECT * FROM candles WHERE {' AND '.join(clauses)} ORDER BY open_time"
+        if limit is not None and (not isinstance(limit, int) or limit < 1):
+            raise ValueError("limit harus integer positif")
+        order = "DESC LIMIT ?" if limit is not None else "ASC"
+        if limit is not None:
+            params.append(limit)
+        query = f"SELECT * FROM candles WHERE {' AND '.join(clauses)} ORDER BY open_time {order}"
         with self._connect() as connection:
             frame = pd.read_sql_query(query, connection, params=params)
         if not frame.empty:
+            if limit is not None:
+                frame = frame.iloc[::-1].reset_index(drop=True)
             frame["open_time"] = pd.to_datetime(frame["open_time"], unit="ms", utc=True)
             frame["close_time"] = pd.to_datetime(frame["close_time"], unit="ms", utc=True)
         return frame

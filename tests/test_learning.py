@@ -217,3 +217,24 @@ def test_scalping_exits_at_time_limit_with_costs(demo):
             conn.execute("SELECT payload FROM demo_records WHERE kind='trade'").fetchone()[0]
         )
     assert trade["exit_reason"] == "max_hold_time"
+
+
+def test_large_history_reads_only_requested_tail_in_time_order(demo):
+    account, _ = demo
+    rows = [[i * 60000, 100, 101, 99, 100, 10, (i + 1) * 60000 - 1, 1000, 5] for i in range(100)]
+    account.market.upsert_klines("BTCUSDT", "1m", rows)
+    tail = account.market.load_candles("BTCUSDT", "1m", limit=10)
+    assert len(tail) == 10
+    assert tail.open_time.is_monotonic_increasing
+    assert tail.open_time.iloc[0] == pd.Timestamp(90 * 60000, unit="ms", tz="UTC")
+    assert len(account.market.load_candles("BTCUSDT", "1m")) == 100
+
+
+def test_account_closes_sqlite_connection_after_transaction(demo):
+    import sqlite3
+
+    account, _ = demo
+    with account.connect() as conn:
+        conn.execute("SELECT 1")
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        conn.execute("SELECT 1")
