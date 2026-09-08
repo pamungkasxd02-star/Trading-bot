@@ -18,3 +18,6 @@ reports/*
 dist/
 build/
 *.egg-info/
+
+!reports/evaluation-quality/
+!reports/evaluation-quality/**

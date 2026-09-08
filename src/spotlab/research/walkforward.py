@@ -112,6 +112,17 @@ def candidates(config: AppConfig) -> list[Candidate]:
             )
             values["risk"].update(stop_mode="atr", atr_stop_multiplier=1.5, reward_risk_ratio=1.2)
             result.append(Candidate(name, AppConfig.model_validate(values)))
+    if config.research.candidate_set == "quality":
+        result = [Candidate("baseline", baseline)]
+        for name, strength, volume in (
+            ("quality_cross", 20, 1.0),
+            ("quality_cross_selective", 25, 1.2),
+        ):
+            values = baseline.model_dump()
+            values["strategy"].update(
+                name="quality_cross_v1", min_adx=strength, min_relative_volume=volume
+            )
+            result.append(Candidate(name, AppConfig.model_validate(values)))
     return result
 
 

@@ -1,0 +1,313 @@
+{
+  "selection": null,
+  "policy_action": "NO_TRADE",
+  "selection_rule": "initial_training_only_then_freeze",
+  "selection_objective": "worst_score_across_capitals_with_profit_drawdown_trade_count_and_WR_constraints",
+  "evaluated_capitals": [
+    20.0,
+    1000.0,
+    10000.0
+  ],
+  "train_end_exclusive": "2025-01-10T08:00:00+00:00",
+  "embargo_bars": 1,
+  "oos_start": "2025-01-10T12:00:00+00:00",
+  "oos_end_exclusive": "2026-07-10T12:00:00+00:00",
+  "unused_tail_start": "2026-07-10T12:00:00+00:00",
+  "data_end_exclusive": "2026-07-10T12:00:00+00:00",
+  "source": {
+    "exchange_verified": false,
+    "evaluation_period_previously_inspected": true,
+    "type": "third_party_csv_snapshot",
+    "repository": "https://github.com/Ilnyr2006-droid/python-paper-trading-agent-1-data",
+    "sources": [
+      {
+        "symbol": "BTCUSDT",
+        "file": "BTCUSDT_4h.csv",
+        "sha256": "f414e226374116aaf224f20c28cb4e9c9d30f5ef8ea3d3d1b5129e4346dc947d",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "BTCUSDT",
+          "min_qty": "0.00001",
+          "max_qty": "100000000",
+          "step_size": "0.00001",
+          "tick_size": "0.01",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "ETHUSDT",
+        "file": "ETHUSDT_4h.csv",
+        "sha256": "2e9bd76b300e1e7a694f2fdb5b03c906af4f46c5924fe66f3588fd4ae561315d",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "ETHUSDT",
+          "min_qty": "0.0001",
+          "max_qty": "100000000",
+          "step_size": "0.0001",
+          "tick_size": "0.01",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "BNBUSDT",
+        "file": "BNBUSDT_4h.csv",
+        "sha256": "06262f5686564b5403fa0fe026274aa89eec8b3bcd11515d542db8dce0594673",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "BNBUSDT",
+          "min_qty": "0.001",
+          "max_qty": "100000000",
+          "step_size": "0.001",
+          "tick_size": "0.01",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "SOLUSDT",
+        "file": "SOLUSDT_4h.csv",
+        "sha256": "a4ca4bb738044d47e22724357dcba16e9cbf3702283f14d7054a47c6742ab124",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "SOLUSDT",
+          "min_qty": "0.001",
+          "max_qty": "100000000",
+          "step_size": "0.001",
+          "tick_size": "0.01",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "XRPUSDT",
+        "file": "XRPUSDT_4h.csv",
+        "sha256": "cbdbdb9239064b138cc0af648629431d73c6bf439dd5712ce83b9d7c3e07e742",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "XRPUSDT",
+          "min_qty": "0.1",
+          "max_qty": "100000000",
+          "step_size": "0.1",
+          "tick_size": "0.0001",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "ADAUSDT",
+        "file": "ADAUSDT_4h.csv",
+        "sha256": "1449f2e821828fd3eae1eb4802bd09d6ef6d4f48dcefd8fa32971ed45fc7ad67",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "ADAUSDT",
+          "min_qty": "0.1",
+          "max_qty": "100000000",
+          "step_size": "0.1",
+          "tick_size": "0.0001",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "file": "AVAXUSDT_4h.csv",
+        "sha256": "c625af10abba7e1b46135afc70694ec1a933120e571edb055cc7d26dbe0a37b7",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "AVAXUSDT",
+          "min_qty": "0.01",
+          "max_qty": "100000000",
+          "step_size": "0.01",
+          "tick_size": "0.01",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      },
+      {
+        "symbol": "LINKUSDT",
+        "file": "LINKUSDT_4h.csv",
+        "sha256": "52b26ab74fec60d5c0338720c4548857a399549e1bb4c11986821b554b9a4188",
+        "rows_used": 6577,
+        "assumed_filters": {
+          "symbol": "LINKUSDT",
+          "min_qty": "0.01",
+          "max_qty": "100000000",
+          "step_size": "0.01",
+          "tick_size": "0.001",
+          "min_notional": "5",
+          "max_notional": "None"
+        }
+      }
+    ],
+    "warning": "Exploratory reuse of earlier history; neither fresh holdout nor Binance-verified filters."
+  },
+  "results": {
+    "baseline": {
+      "initial_cash": 1000.0,
+      "final_equity": 918.8190439512524,
+      "net_return_pct": -8.118095604874764,
+      "trade_count": 14,
+      "win_rate_pct": 14.285714285714285,
+      "profit_factor": 0.29485570402851785,
+      "max_drawdown_pct": 10.690340842143648,
+      "average_win": 16.97288632001478,
+      "average_loss": -9.5938940573981,
+      "expectancy_per_trade": -5.798639717767687,
+      "total_fees": 9.741917793848001,
+      "min_notional_skips": 0,
+      "candidate": "baseline",
+      "fingerprint": "624a42c3a29ac5b7ad862870f46abf31f7bd4c8031676c5e7f407752ec73076b",
+      "symbols": [
+        "ADAUSDT",
+        "AVAXUSDT",
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "LINKUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ],
+      "train_selected": false,
+      "oos_start": "2025-01-10T12:00:00+00:00",
+      "oos_end": "2026-07-10T12:00:00+00:00",
+      "win_rate_ci_low_pct": 4.009392127146497,
+      "win_rate_ci_high_pct": 39.941379496970356,
+      "positive_windows_ratio": 0.0,
+      "window_count": 6,
+      "evaluated_capitals": [
+        20.0,
+        1000.0,
+        10000.0
+      ],
+      "target_win_rate_pct": 55.0,
+      "status": "RESEARCH_FAIL",
+      "failures": [
+        "insufficient_oos_trades",
+        "win_rate_below_research_target",
+        "unprofitable_after_costs",
+        "excessive_drawdown",
+        "inconsistent_oos_windows",
+        "cost_stress_failed",
+        "source_or_exchange_filters_unverified",
+        "not_selected_on_training",
+        "capital_validation_failed:20",
+        "capital_validation_failed:1000",
+        "capital_validation_failed:10000",
+        "evaluation_period_previously_inspected"
+      ]
+    },
+    "quality_cross": {
+      "initial_cash": 1000.0,
+      "final_equity": 959.8449337807335,
+      "net_return_pct": -4.0155066219266455,
+      "trade_count": 10,
+      "win_rate_pct": 20.0,
+      "profit_factor": 0.44860401293308527,
+      "max_drawdown_pct": 4.5712019890554565,
+      "average_win": 16.33465265260505,
+      "average_loss": -9.103046440559574,
+      "expectancy_per_trade": -4.015506621926649,
+      "total_fees": 6.943293102867001,
+      "min_notional_skips": 0,
+      "candidate": "quality_cross",
+      "fingerprint": "8978072bf4cdf73b700e080ce66de20228683519df3ebba31c98a216b64f8a6e",
+      "symbols": [
+        "ADAUSDT",
+        "AVAXUSDT",
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "LINKUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ],
+      "train_selected": false,
+      "oos_start": "2025-01-10T12:00:00+00:00",
+      "oos_end": "2026-07-10T12:00:00+00:00",
+      "win_rate_ci_low_pct": 5.668215145437519,
+      "win_rate_ci_high_pct": 50.983752846335825,
+      "positive_windows_ratio": 0.16666666666666666,
+      "window_count": 6,
+      "evaluated_capitals": [
+        20.0,
+        1000.0,
+        10000.0
+      ],
+      "target_win_rate_pct": 55.0,
+      "status": "RESEARCH_FAIL",
+      "failures": [
+        "insufficient_oos_trades",
+        "win_rate_below_research_target",
+        "unprofitable_after_costs",
+        "inconsistent_oos_windows",
+        "cost_stress_failed",
+        "source_or_exchange_filters_unverified",
+        "not_selected_on_training",
+        "capital_validation_failed:20",
+        "capital_validation_failed:1000",
+        "capital_validation_failed:10000",
+        "evaluation_period_previously_inspected"
+      ]
+    },
+    "quality_cross_selective": {
+      "initial_cash": 1000.0,
+      "final_equity": 975.1753853620271,
+      "net_return_pct": -2.482461463797292,
+      "trade_count": 3,
+      "win_rate_pct": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown_pct": 2.4824614637972897,
+      "average_win": 0.0,
+      "average_loss": -8.274871545990953,
+      "expectancy_per_trade": -8.274871545990953,
+      "total_fees": 2.092982706173,
+      "min_notional_skips": 0,
+      "candidate": "quality_cross_selective",
+      "fingerprint": "6c0a3f452cf81ac516b8fb72bbe847266e064ccbcf17c13fd1fb2356e56a4805",
+      "symbols": [
+        "ADAUSDT",
+        "AVAXUSDT",
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "LINKUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ],
+      "train_selected": false,
+      "oos_start": "2025-01-10T12:00:00+00:00",
+      "oos_end": "2026-07-10T12:00:00+00:00",
+      "win_rate_ci_low_pct": 5.551115123125783e-15,
+      "win_rate_ci_high_pct": 56.14970317550454,
+      "positive_windows_ratio": 0.0,
+      "window_count": 6,
+      "evaluated_capitals": [
+        20.0,
+        1000.0,
+        10000.0
+      ],
+      "target_win_rate_pct": 55.0,
+      "status": "RESEARCH_FAIL",
+      "failures": [
+        "insufficient_oos_trades",
+        "win_rate_below_research_target",
+        "unprofitable_after_costs",
+        "inconsistent_oos_windows",
+        "cost_stress_failed",
+        "source_or_exchange_filters_unverified",
+        "not_selected_on_training",
+        "capital_validation_failed:20",
+        "capital_validation_failed:1000",
+        "capital_validation_failed:10000",
+        "evaluation_period_previously_inspected"
+      ]
+    }
+  },
+  "limitations": [
+    "Static universe has survivorship bias; it is not all past Binance listings.",
+    "OHLCV stop/target fills approximate execution; stop-limit fills are not guaranteed.",
+    "Backtest windows cannot prove future win rate; research stops do not enable live."
+  ]
+}

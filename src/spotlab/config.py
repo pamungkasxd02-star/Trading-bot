@@ -137,7 +137,7 @@ class ResearchConfig(StrictModel):
     min_train_trades: int = Field(10, ge=1)
     min_oos_trades: int = Field(20, ge=1)
     min_folds: int = Field(3, ge=2)
-    candidate_set: Literal["baseline", "regime"] = "baseline"
+    candidate_set: Literal["baseline", "regime", "quality"] = "baseline"
     evaluation_capitals: list[float] = Field(default_factory=list)
     target_win_rate_pct: float = Field(0, ge=0, le=90)
 

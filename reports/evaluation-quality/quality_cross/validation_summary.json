@@ -1,0 +1,53 @@
+{
+  "initial_cash": 1000.0,
+  "final_equity": 959.8449337807335,
+  "net_return_pct": -4.0155066219266455,
+  "trade_count": 10,
+  "win_rate_pct": 20.0,
+  "profit_factor": 0.44860401293308527,
+  "max_drawdown_pct": 4.5712019890554565,
+  "average_win": 16.33465265260505,
+  "average_loss": -9.103046440559574,
+  "expectancy_per_trade": -4.015506621926649,
+  "total_fees": 6.943293102867001,
+  "min_notional_skips": 0,
+  "candidate": "quality_cross",
+  "fingerprint": "8978072bf4cdf73b700e080ce66de20228683519df3ebba31c98a216b64f8a6e",
+  "symbols": [
+    "ADAUSDT",
+    "AVAXUSDT",
+    "BNBUSDT",
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "SOLUSDT",
+    "XRPUSDT"
+  ],
+  "train_selected": false,
+  "oos_start": "2025-01-10T12:00:00+00:00",
+  "oos_end": "2026-07-10T12:00:00+00:00",
+  "win_rate_ci_low_pct": 5.668215145437519,
+  "win_rate_ci_high_pct": 50.983752846335825,
+  "positive_windows_ratio": 0.16666666666666666,
+  "window_count": 6,
+  "evaluated_capitals": [
+    20.0,
+    1000.0,
+    10000.0
+  ],
+  "target_win_rate_pct": 55.0,
+  "status": "RESEARCH_FAIL",
+  "failures": [
+    "insufficient_oos_trades",
+    "win_rate_below_research_target",
+    "unprofitable_after_costs",
+    "inconsistent_oos_windows",
+    "cost_stress_failed",
+    "source_or_exchange_filters_unverified",
+    "not_selected_on_training",
+    "capital_validation_failed:20",
+    "capital_validation_failed:1000",
+    "capital_validation_failed:10000",
+    "evaluation_period_previously_inspected"
+  ]
+}
