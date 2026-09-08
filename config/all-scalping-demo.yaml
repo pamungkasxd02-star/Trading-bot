@@ -1,0 +1,49 @@
+# Scalping forward eksperimental. Bukan strategi yang sudah terbukti profitable.
+demo:
+  name: Scalping Semua Pair
+  database: data/learning-all-scalping.db
+  initial_cash: 1000
+  interval: 1m
+  warmup_bars: 500
+  quote_seconds: 5
+  max_hold_seconds: 900
+  repair_seconds: 300
+  kill_switch_file: data/ALL_SCALPING_DEMO_STOP_TRADING
+universe:
+  mode: all
+  max_symbols: null
+  min_quote_volume: 5000000
+  max_spread_bps: 10
+strategy:
+  name: curve_scalping_v1
+  ema_fast: 9
+  ema_slow: 21
+  sma_trend: 50
+  rsi_min: 45
+  rsi_max: 68
+  min_confirmations: 3
+  min_adx: 20
+  min_atr_pct: 0.15
+  max_atr_pct: 1.5
+  min_relative_volume: 1.0
+  pullback_lookback: 5
+  max_signal_candle_atr: 2.5
+  max_pullback_distance_atr: 1.5
+  min_close_location: 0.65
+  min_reversion_score: 60
+backtest:
+  fee_bps: 10
+  slippage_bps: 5
+risk:
+  stop_mode: fixed
+  stop_loss_pct: 0.6
+  take_profit_pct: 1.2
+  risk_per_trade_pct: 0.25
+  max_allocation_pct: 25
+  max_open_positions: 1
+  daily_loss_limit_pct: 3
+  max_drawdown_pct: 10
+  cooldown_bars: 2
+runtime:
+  max_signal_age_seconds: 30
+  max_signal_price_drift_bps: 20

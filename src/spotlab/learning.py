@@ -320,6 +320,18 @@ class DemoEngine:
             }
             if not math.isfinite(payload["signal_score"]):
                 payload["signal_score"] = 0
+            payload["diagnostics"] = {
+                key: float(row[key])
+                for key in (
+                    "curve_efficiency",
+                    "curve_slope_atr",
+                    "close_location",
+                    "adx",
+                    "atr_pct",
+                    "relative_volume",
+                )
+                if key in row and pd.notna(row[key]) and math.isfinite(float(row[key]))
+            }
             self.account.record(conn, "signal", symbol, payload)
             if fresh:
                 state["pending"][symbol] = payload
@@ -584,7 +596,19 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
     tasks.append(asyncio.create_task(guard(heartbeats())))
     try:
         discovery = await asyncio.to_thread(discover_universe, client, config)
+        account.market.set_metadata(
+            "learning_universe",
+            {
+                "observed_at": timestamp(),
+                "selected": discovery["selected"],
+                "rejected": discovery["rejected"],
+                "refresh": "on_process_start",
+            },
+        )
         symbols = [r["symbol"] for r in discovery["selected"]]
+        LOGGER.info(
+            "DEMO scanner: %d selected, %d rejected", len(symbols), len(discovery["rejected"])
+        )
         if not symbols:
             raise RuntimeError("Tidak ada pair yang lolos filter data demo")
         position = account.status()["position"]

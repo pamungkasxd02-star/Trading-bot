@@ -40,6 +40,7 @@ def parser() -> argparse.ArgumentParser:
     demo_run.add_argument("--duration-seconds", type=int)
     commands.add_parser("demo-status", help="Saldo virtual, posisi, data, dan statistik demo")
     commands.add_parser("demo-health", help="Status data real-time; exit 2 jika stale/offline")
+    commands.add_parser("demo-universe", help="Pair terpilih/ditolak dan alasan filter demo")
     commands.add_parser(
         "demo-stop-trading", help="Hentikan trading virtual; data tetap dikumpulkan"
     )
@@ -221,6 +222,11 @@ def _dispatch(args: argparse.Namespace) -> None:
                 raise SystemExit(2)
         elif args.command == "demo-export":
             print(account.export(args.output).resolve())
+        elif args.command == "demo-universe":
+            snapshot = account.market.metadata("learning_universe")
+            if not snapshot:
+                raise RuntimeError("Belum ada hasil scanner; jalankan demo-run dahulu")
+            print(json.dumps(snapshot, indent=2))
         else:
             config.demo.kill_switch_file.parent.mkdir(parents=True, exist_ok=True)
             config.demo.kill_switch_file.touch()

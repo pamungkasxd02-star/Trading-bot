@@ -38,6 +38,11 @@ Tidak perlu mengaktifkan virtual environment atau membuat `.env` untuk demo inte
 Bot menunggu sinyal pada candle tertutup; tidak harus membuka trade setiap menit.
 Saldo, posisi, dan data akun sebelumnya dipulihkan ketika dijalankan kembali.
 
+Untuk **semua pair Spot/USDT yang layak**, tersedia `bash scripts/all-scalping-demo.sh`.
+Preset terpisah ini memakai filter kurva/tren/pullback, tanpa batas top 30.
+Lihat [panduan semua coin dan scalping](docs/ALL_COIN_SCALPING.md), termasuk
+alasan penolakan coin, beban data, dan biaya/pajak yang belum masuk PnL demo.
+
 ## Pilih mode yang tepat
 
 | Mode | Harga dan order | Status / penggunaan |
@@ -80,7 +85,7 @@ ketika koneksi putus, exit virtual tidak bisa langsung terjadi.
 | Risiko / alokasi maksimum | 1% / 50% equity | 0,25% / 25% equity |
 | Database | `data/learning.db` | `data/learning-scalping.db` |
 
-Keduanya maksimal satu posisi, daily loss limit 3%, drawdown limit 10%, fee 10 bps dan
+Preset demo delapan pair tersebut maksimal satu posisi, daily loss limit 3%, drawdown limit 10%, fee 10 bps dan
 slippage 5 bps per sisi. SL/TP virtual hanya bekerja saat proses hidup dan menerima
 harga; saat restart setelah gap, posisi ditutup pada harga baru yang teramati, bukan
 pada harga stop yang diasumsikan. Gap dapat membuat kerugian melewati batas konfigurasi.
@@ -102,6 +107,7 @@ Detail: [akun demo dan scalping](docs/LEARNING_DEMO.md).
 | `adaptive_trend_v2` | Tren/pullback, ADX, ATR, tren harian yang sudah selesai |
 | `regime_reversion_v3` | Rebound terkonfirmasi pada tren atau range |
 | `quality_cross_v1` | Filter crossover: ADX, ATR, volume, kemiringan SMA, batas lonjakan |
+| `curve_scalping_v1` | Kurva tren, pullback, pemulihan candle, efisiensi gerakan; eksperimen 1m |
 
 `quality_cross_v1` adalah hipotesis baru, bukan preset yang otomatis menggantikan demo.
 Dua varian kualitas diuji bersama baseline dengan biaya dan aturan risiko yang sama.

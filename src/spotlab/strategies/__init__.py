@@ -1,5 +1,6 @@
 from spotlab.strategies.adaptive import AdaptiveTrendStrategy
 from spotlab.strategies.base import Strategy
+from spotlab.strategies.curve import CurveScalpingStrategy
 from spotlab.strategies.quality import QualityCrossStrategy
 from spotlab.strategies.regime import RegimeReversionStrategy
 from spotlab.strategies.rule_based import RuleBasedStrategy
@@ -9,6 +10,7 @@ STRATEGIES: dict[str, type[Strategy]] = {
     "adaptive_trend_v2": AdaptiveTrendStrategy,
     "regime_reversion_v3": RegimeReversionStrategy,
     "quality_cross_v1": QualityCrossStrategy,
+    "curve_scalping_v1": CurveScalpingStrategy,
 }
 
 
