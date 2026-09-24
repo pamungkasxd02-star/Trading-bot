@@ -79,7 +79,8 @@ Windows: ganti `.venv/bin/python` dengan `.venv\Scripts\python.exe`.
 Gambar/caption dikirim ke layanan Telegram dan chat yang dikonfigurasi. Pengiriman
 memakai `protect_content`, tetapi tidak dapat menjamin penerima tidak mengambil foto
 layar atau menyalin informasi secara manual. Tidak perlu membuka port publik/webhook;
-integrasi ini outbound saja dan belum menyediakan command bot seperti `/buy`/`sell`.
+integrasi ini memakai request keluar. Kontrol demo opsional tersedia melalui
+[panduan command Telegram](TELEGRAM_CONTROL.md); tidak ada perintah order live `/buy`/`sell`.
 
 Token yang pernah bocor harus dicabut/dirotasi melalui BotFather. Jangan menjalankan
 mode debug jaringan yang mencetak URL request. Ikuti [panduan privasi](CODESPACES_PRIVACY.md).

@@ -191,6 +191,7 @@ class DemoConfig(StrictModel):
 
 
 class CandleAlertsConfig(StrictModel):
+    commands_enabled: bool = False
     enabled: bool = False
     setups_only: bool = True
     symbols: list[str] = Field(default_factory=list)

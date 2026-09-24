@@ -30,6 +30,14 @@ order virtual dan tidak otomatis melatih AI.
 Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo-signals`.
 [Panduan belajar candle](docs/CANDLE_STUDY.md) menjelaskan tiap indikator dan batasannya.
 
+## Kontrol lewat Telegram
+
+Lihat coin dan status, pilih gambar dengan `/watch BTCUSDT ETHUSDT`, minta `/chart BTCUSDT`,
+dan atur entry demo dengan `/tradecoins` serta `/auto on|off`. Perintah hanya diterima
+dari chat pribadi pemilik yang dikonfigurasi. Akun belajar tetap tanpa order; filter
+kualitas, SL/TP dan risk halt tetap berlaku. [Panduan kontrol Telegram](docs/TELEGRAM_CONTROL.md).
+Tidak ada jaminan coin bebas manipulasi atau harga terus naik.
+
 ## Candle ke Telegram
 
 Grafik candle + EMA + volume dan alasan setup dapat dikirim oleh collector demo/belajar.

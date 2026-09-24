@@ -53,6 +53,7 @@ runtime:
 # Aktifkan setelah mengisi dua secret Telegram secara privat.
 candle_alerts:
   enabled: false
+  commands_enabled: false
   setups_only: true
   symbols: []
   bars: 60

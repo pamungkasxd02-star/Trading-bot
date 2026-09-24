@@ -88,3 +88,21 @@ class TelegramNotifier:
             raise PhotoDeliveryError(delay) from None
         except Exception:
             raise PhotoDeliveryError() from None
+
+    def updates(self, offset: int):
+        if not self.enabled:
+            return []
+        try:
+            body = urlencode(
+                {"offset": offset, "limit": 1, "timeout": 0, "allowed_updates": '["message"]'}
+            ).encode()
+            request = Request(
+                f"https://api.telegram.org/bot{self.token}/getUpdates", data=body, method="POST"
+            )
+            with urlopen(request, timeout=15) as response:
+                payload = json.loads(response.read())
+            if not payload.get("ok"):
+                raise RuntimeError("Polling rejected")
+            return payload.get("result", [])
+        except Exception:
+            raise RuntimeError("Telegram polling failed; inspect token/webhook privately") from None

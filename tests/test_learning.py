@@ -431,3 +431,123 @@ def test_analysis_mode_cannot_be_changed_on_existing_account(demo):
     account.config.demo.analysis_only = True
     with pytest.raises(RuntimeError, match="Konfigurasi berubah"):
         account.start()
+
+
+class ControlCapture:
+    chat_id = "12345"
+
+    def __init__(self):
+        self.sent = []
+
+    def send(self, text):
+        self.sent.append(text)
+
+
+def command_update(text, uid=1, owner=12345, **changes):
+    message = dict(
+        chat={"id": owner, "type": "private"},
+        **{"from": {"id": owner, "is_bot": False}},
+        date=int(time.time()),
+        text=text,
+    )
+    message.update(changes)
+    return {"update_id": uid, "message": message}
+
+
+def test_telegram_control_rejects_other_owner_stale_and_duplicate(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("/auto off", owner=54321))
+    bot.process(command_update("/auto off", uid=2, date=int(time.time()) - 300))
+    assert not sender.sent
+    assert "auto" not in account.status()["telegram_control"]
+    bot.process(command_update("/auto off", uid=3))
+    bot.process(command_update("/auto on", uid=3))
+    assert account.status()["telegram_control"]["auto"] is False
+    assert len(sender.sent) == 1
+
+
+def test_telegram_auto_off_blocks_entry_but_can_resume_with_new_signal(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, engine = demo
+    bot = TelegramControl(account, ControlCapture())
+    bot.process(command_update("/auto off"))
+    row = entry_row()
+    engine.signal("BTCUSDT", row)
+    engine.quotes(quote())
+    assert account.status()["position"] is None
+    bot.process(command_update("/auto on", uid=2))
+    # /auto on itself cannot buy or reuse an old pending signal.
+    engine.quotes(quote())
+    assert account.status()["position"] is None
+    row["close_time"] += pd.Timedelta(1, unit="ms")
+    engine.signal("BTCUSDT", row)
+    engine.quotes(quote())
+    assert account.status()["position"]["symbol"] == "BTCUSDT"
+
+
+def test_telegram_cannot_override_analysis_or_risk_halt(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    bot = TelegramControl(account, ControlCapture())
+    bot.process(command_update("/auto off"))
+    account.config.demo.analysis_only = True
+    bot.process(command_update("/auto on", uid=2))
+    assert account.status()["telegram_control"]["auto"] is False
+    account.config.demo.analysis_only = False
+    with account.edit() as (_, state):
+        state["halt_reason"] = "daily loss limit"
+    bot.process(command_update("/auto on", uid=3))
+    assert account.status()["telegram_control"]["auto"] is False
+    assert account.status()["halt_reason"] == "daily loss limit"
+
+
+def test_watch_does_not_change_trade_universe_and_tradecoins_blocks_entry(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, engine = demo
+    account.market.set_metadata("learning_source", {"symbols": ["BTCUSDT", "ETHUSDT"]})
+    bot = TelegramControl(account, ControlCapture())
+    bot.process(command_update("/watch BTCUSDT"))
+    bot.process(command_update("/tradecoins ETHUSDT", uid=2))
+    state = account.status()["telegram_control"]
+    assert state["watch"] == ["BTCUSDT"] and state["tradecoins"] == ["ETHUSDT"]
+    engine.signal("BTCUSDT", entry_row())
+    engine.quotes(quote())
+    assert account.status()["position"] is None
+    bot.process(command_update("/tradecoins UNKNOWNUSDT", uid=3))
+    assert account.status()["telegram_control"]["tradecoins"] == ["ETHUSDT"]
+
+
+def test_telegram_group_and_sender_impersonation_rejected(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("/status", chat={"id": 12345, "type": "group"}))
+    bot.process(command_update("/status", uid=2, **{"from": {"id": 999}}))
+    assert not sender.sent
+
+
+def test_telegram_alert_settings_do_not_toggle_auto_and_order_notice_dedupes(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, engine = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("/alerts off"))
+    bot.process(command_update("/mode observe", uid=2))
+    control = account.status()["telegram_control"]
+    assert control["alerts"] is False and control["setups_only"] is False
+    assert control.get("auto", True)
+    engine.signal("BTCUSDT", entry_row())
+    engine.quotes(quote())
+    bot.order_notice()
+    bot.order_notice()
+    assert sum("DEMO BUY" in text for text in sender.sent) == 1

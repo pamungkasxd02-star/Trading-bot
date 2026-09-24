@@ -85,6 +85,8 @@ class CandleAlerts:
         now = time.time()
         with account.edit() as (conn, state):
             delivery = state.setdefault("candle_alerts", {"cursor": 0, "next_at": 0, "symbols": {}})
+            if not state.get("telegram_control", {}).get("alerts", True):
+                return
             if now < delivery["next_at"]:
                 return
             rows = conn.execute(
@@ -105,9 +107,11 @@ class CandleAlerts:
                 age = now - signal["close_time"] / 1000
                 if not 0 < age <= account.config.runtime.max_signal_age_seconds:
                     continue
-                if cfg.symbols and symbol not in cfg.symbols:
+                watch = state.get("telegram_control", {}).get("watch", cfg.symbols)
+                if watch and symbol not in watch:
                     continue
-                if cfg.setups_only and (not signal["enter_long"] or signal["exit_long"]):
+                setups_only = state.get("telegram_control", {}).get("setups_only", cfg.setups_only)
+                if setups_only and (not signal["enter_long"] or signal["exit_long"]):
                     continue
                 if now - delivery["symbols"].get(symbol, 0) < cfg.symbol_cooldown_seconds:
                     continue

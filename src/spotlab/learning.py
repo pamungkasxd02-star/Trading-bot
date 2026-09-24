@@ -516,11 +516,13 @@ class DemoEngine:
             if (
                 not state["position"]
                 and not self.config.demo.analysis_only
+                and state.get("telegram_control", {}).get("auto", True)
                 and not state["halt_reason"]
                 and now >= state["cooldown_until"]
             ):
                 for symbol in ranked_entries(pending):
-                    if symbol not in valid:
+                    allowed = state.get("telegram_control", {}).get("tradecoins", [])
+                    if symbol not in valid or (allowed and symbol not in allowed):
                         continue
                     row = pending[symbol]
                     bid, ask = valid[symbol]
@@ -663,6 +665,7 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
             )
     account = DemoAccount(config)
     alerts = None
+    control = None
     if config.candle_alerts.enabled:
         from spotlab.candle_alerts import CandleAlerts, TelegramSecrets
         from spotlab.notifier import TelegramNotifier
@@ -674,6 +677,10 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
             account,
             TelegramNotifier(credentials.telegram_bot_token, credentials.telegram_chat_id, True),
         )
+    if alerts is not None and config.candle_alerts.commands_enabled:
+        from spotlab.telegram_control import TelegramControl
+
+        control = TelegramControl(account, alerts.notifier)
     account.start()
     client = PublicMarketClient(timeout=config.exchange.rest_timeout_seconds)
     stop = asyncio.Event()
@@ -792,6 +799,16 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
                     failures = 0
                 await pause(min(60, config.demo.quote_seconds * 2 ** min(failures, 4)))
 
+        async def control_loop():
+            while not stop.is_set():
+                try:
+                    await asyncio.to_thread(control.tick)
+                except Exception:
+                    LOGGER.warning("Telegram command failed; details hidden to protect secrets")
+                    await pause(60)
+                else:
+                    await pause(5)
+
         async def alert_loop():
             while not stop.is_set():
                 try:
@@ -810,6 +827,8 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
         tasks.extend(
             asyncio.create_task(guard(c)) for c in (collect(), quote_loop(), repair_loop())
         )
+        if control is not None:
+            tasks.append(asyncio.create_task(guard(control_loop())))
         if alerts is not None:
             tasks.append(asyncio.create_task(guard(alert_loop())))
         if duration_seconds is not None:
