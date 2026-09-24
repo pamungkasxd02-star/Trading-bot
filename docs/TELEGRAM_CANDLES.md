@@ -89,3 +89,11 @@ Tes memakai transport tiruan; pengiriman nyata menunggu token, chat tujuan, dan 
 aktif pada lingkungan pengguna. Fitur ini tidak membuktikan peningkatan win rate.
 
 Referensi: [Telegram sendPhoto](https://core.telegram.org/bots/api#sendphoto).
+
+## Grafik sesuai coin dan interval dari Telegram
+
+Aktifkan command sesuai [panduan kontrol](TELEGRAM_CONTROL.md), lalu gunakan
+`/chart bitcoin 15m`, `/chart ETH/BTC 4h`, atau `/chart BTC 1M`. `/coins` mencari
+pair Binance Spot aktif, `/intervals` menampilkan timeframe. Grafik manual mengambil
+data publik terbaru; perintah CLI `demo-chart` tetap memakai cache lokal. Grafik
+manual tidak mengubah interval strategi atau membuka izin buy untuk coin tersebut.

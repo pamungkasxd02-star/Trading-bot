@@ -7,15 +7,14 @@ import math
 import time
 from datetime import UTC, datetime
 
-import pandas as pd
-
 from spotlab.candle_alerts import candle_png
+from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selected_symbol
 
 HELP = (
-    "/status /health /coins [page] /signals [COIN] /settings\n"
+    "/status /health /coins [query] [page] /eligible [page] /signals [COIN] /settings\n"
     "/watch ALL or BTCUSDT ETHUSDT (pictures only)\n"
     "/tradecoins ALL or BTCUSDT ETHUSDT (demo entries)\n"
-    "/chart BTCUSDT\n/auto on | off\n/alerts on | off\n/mode setups | observe\n"
+    "/chart BTC 15m | /intervals\n/auto on | off\n/alerts on | off\n/mode setups | observe\n"
     "Demo only; filters/SL/TP/risk limits always apply."
 )
 
@@ -27,6 +26,7 @@ class TelegramControl:
             raise ValueError("Command Telegram memerlukan chat ID privat numerik positif")
         self.owner = int(notifier.chat_id)
         self.started = int(time.time())
+        self.market_charts = MarketCharts()
 
     def tick(self):
         with self.account.connect() as conn:
@@ -121,22 +121,41 @@ class TelegramControl:
                 selected = set(account.market.metadata("learning_source").get("symbols", []))
                 if symbols == ["ALL"]:
                     symbols = []
-                elif not symbols or not set(symbols) <= selected:
-                    reply = "Pilih coin dari /coins. Gunakan simbol BTCUSDT, ETHUSDT, atau ALL."
+                else:
+                    try:
+                        symbols = list(dict.fromkeys(selected_symbol(s, selected) for s in args))
+                        if not symbols:
+                            raise ValueError("Gunakan coin dari /eligible atau ALL.")
+                    except ValueError as exc:
+                        reply = str(exc)
                 if reply is None:
                     key = "watch" if command == "/watch" else "tradecoins"
                     control[key] = symbols
                     if key == "tradecoins":
                         state["pending"] = {}
                     reply = f"{key}: {', '.join(symbols) if symbols else 'ALL eligible'}"
-            elif command in {"/status", "/health", "/coins", "/signals", "/chart", "/settings"}:
+            elif command in {
+                "/status",
+                "/health",
+                "/coins",
+                "/signals",
+                "/chart",
+                "/settings",
+                "/eligible",
+                "/intervals",
+            }:
                 reply = (command, args)
             else:
                 reply = HELP
         # Network/chart work happens after releasing the account transaction.
         if isinstance(reply, tuple):
             command, args = reply
-            reply = self.read_command(command, args)
+            try:
+                reply = self.read_command(command, args)
+            except ValueError as exc:
+                reply = str(exc)
+            except Exception:
+                reply = "Data/layanan belum tersedia. Coba lagi; detail jaringan tidak ditampilkan."
         if reply:
             self.notifier.send(reply[:3900])
 
@@ -166,7 +185,22 @@ class TelegramControl:
                 f"Global interval: {account.config.candle_alerts.min_interval_seconds}s | "
                 f"coin cooldown: {account.config.candle_alerts.symbol_cooldown_seconds}s"
             )
+        if command == "/intervals":
+            return "Interval chart: " + " ".join(INTERVALS) + "\n1m=menit; 1M=bulan."
         if command == "/coins":
+            catalogue = self.market_charts.catalogue()
+            query = normalize_coin(args[0]) if args and not args[0].isdigit() else ""
+            page_arg = args[-1] if args and args[-1].isdigit() else "1"
+            symbols = sorted(s for s in catalogue if query in s)
+            page, pages = int(page_arg), max(1, math.ceil(len(symbols) / 40))
+            if not 1 <= page <= pages:
+                return f"Halaman 1-{pages}"
+            return (
+                f"Binance Spot {len(symbols)} pair | {page}/{pages} | chart only\n"
+                + " ".join(symbols[(page - 1) * 40 : page * 40])
+                + "\n/eligible untuk pair yang boleh dipilih trading."
+            )
+        if command == "/eligible":
             symbols = sorted(account.market.metadata("learning_source").get("symbols", []))
             page = int(args[0]) if args and args[0].isdigit() else 1
             pages = max(1, math.ceil(len(symbols) / 40))
@@ -178,33 +212,30 @@ class TelegramControl:
         if command == "/signals":
             rows = account.signals(2000 if args else 20)
             if args:
-                rows = [r for r in rows if r["symbol"] == args[0].upper()]
+                symbol = selected_symbol(args[0], {r["symbol"] for r in rows})
+                rows = [r for r in rows if r["symbol"] == symbol]
             return (
                 "\n".join(
                     f"{r['symbol']}: {r['assessment']}, score={r['signal_score']:.1f}" for r in rows
                 )
                 or "Belum ada sinyal."
             )
-        symbols = account.market.metadata("learning_source").get("symbols", [])
-        if len(args) != 1 or args[0].upper() not in symbols:
-            return "Gunakan /chart BTCUSDT; pilih coin dari /coins."
-        symbol = args[0].upper()
-        frame = account.market.load_candles(
-            symbol, account.config.demo.interval, limit=account.config.demo.warmup_bars
-        )
-        if frame.empty:
-            return "Data candle belum tersedia."
-        now = pd.Timestamp.now(tz="UTC")
-        frame = frame[frame.close_time < now]
-        if len(frame) < 2 or (now - frame.close_time.iloc[-1]).total_seconds() > 120:
-            return "Data belum cukup atau stale; periksa /health."
+        if not 1 <= len(args) <= 2:
+            return "Contoh: /chart bitcoin 15m atau /chart ETHBTC 4h. /intervals untuk pilihan."
+        interval = args[1] if len(args) == 2 else account.config.demo.interval
+        market, frame = self.market_charts.candles(args[0], interval)
         png = candle_png(
             frame,
-            symbol,
-            account.config.demo.interval,
+            market["symbol"],
+            interval,
             account.config.strategy.ema_fast,
             account.config.strategy.ema_slow,
             account.config.candle_alerts.bars,
+            quote_asset=market["quoteAsset"],
         )
-        self.notifier.send_photo(png, f"{symbol} | closed candles | educational, bukan order")
+        self.notifier.send_photo(
+            png,
+            f"{market['symbol']} | {interval} | closed {frame.close_time.iloc[-1].isoformat()}\n"
+            "Grafik publik saja; tidak menambahkan coin ke trading/watchlist.",
+        )
         return None

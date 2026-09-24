@@ -551,3 +551,40 @@ def test_telegram_alert_settings_do_not_toggle_auto_and_order_notice_dedupes(dem
     bot.order_notice()
     bot.order_notice()
     assert sum("DEMO BUY" in text for text in sender.sent) == 1
+
+
+def test_manual_chart_and_catalogue_independent_of_trade_universe(demo, monkeypatch):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    account.market.set_metadata("learning_source", {"symbols": ["BTCUSDT"]})
+    sender = ControlCapture()
+    photos = []
+    sender.send_photo = lambda png, caption: photos.append((png, caption))
+    bot = TelegramControl(account, sender)
+    market = {"symbol": "ETHBTC", "quoteAsset": "BTC"}
+    bot.market_charts.catalogue = lambda: {"ETHBTC": market, "BTCUSDT": {}}
+    calls = []
+
+    def candles(coin, interval):
+        calls.append((coin, interval))
+        return market, pd.DataFrame({"close_time": [pd.Timestamp.now(tz="UTC")]})
+
+    bot.market_charts.candles = candles
+    rendered = []
+
+    def render(*args, **kwargs):
+        rendered.append(kwargs)
+        return b"png"
+
+    monkeypatch.setattr("spotlab.telegram_control.candle_png", render)
+    bot.process(command_update("/chart ETH/BTC 4h"))
+    assert calls == [("ETH/BTC", "4h")]
+    assert rendered == [{"quote_asset": "BTC"}]
+    assert "ETHBTC | 4h" in photos[0][1]
+    assert "ETHBTC" in bot.read_command("/coins", [])
+    assert "ETHBTC" not in bot.read_command("/eligible", [])
+    bot.process(command_update("/watch bitcoin", uid=2))
+    assert account.status()["telegram_control"]["watch"] == ["BTCUSDT"]
+    bot.process(command_update("/tradecoins ETHBTC", uid=3))
+    assert not account.status()["telegram_control"].get("tradecoins")

@@ -36,13 +36,16 @@ atau update yang sudah diproses diabaikan. Pada awal polling, backlog lama dilew
 | --- | --- |
 | `/help` | Daftar perintah |
 | `/status` atau `/health` | Health, equity virtual, jumlah trade, WR, PF, expectancy, posisi, halt |
-| `/coins 1` | Daftar pair yang lolos scanner, 40 pair per halaman |
+| `/coins 1` atau `/coins bitcoin 1` | Cari semua pair Binance Spot aktif, 40 per halaman |
+| `/eligible 1` | Pair yang lolos scanner untuk watchlist dan trading demo |
 | `/signals` | Sampai 20 analisis tersimpan terbaru; stale ditandai |
 | `/signals BTCUSDT` | Analisis terakhir coin yang dipilih |
 | `/settings` | Watchlist, cakupan auto-buy, mode dan jeda gambar |
 | `/watch BTCUSDT ETHUSDT` | Batasi notifikasi gambar otomatis ke coin tersebut |
 | `/watch ALL` | Gambar dari semua pair yang dipindai, tetap dibatasi frekuensi |
-| `/chart BTCUSDT` | Minta satu grafik candle terbaru dari cache |
+| `/chart bitcoin 15m` | Grafik terbaru coin dan interval pilihan dari API publik |
+| `/chart ETH/BTC 4h` | Pair eksplisit, dengan sumbu harga dalam BTC |
+| `/intervals` | Interval candle yang didukung |
 | `/mode observe` | Gambar pengamatan, tidak harus menunggu setup |
 | `/mode setups` | Gambar hanya ketika setup entry terdeteksi |
 | `/alerts off` atau `/alerts on` | Matikan/hidupkan gambar otomatis |
@@ -81,8 +84,8 @@ preset masih perlu diuji pada data 1m forward; pajak belum termasuk PnL simulato
 
 Polling memakai request keluar, tanpa port publik/webhook. Satu update diproses per
 putaran (sekitar 5 detik setelah request selesai), lalu pesan order baru bila ada.
-Gangguan command diberi jeda 60 detik; collector tetap berjalan. Grafik manual yang
-histori terakhirnya lebih dari 120 detik ditolak. Timestamp gambar tetap perlu dibaca.
+Gangguan command diberi jeda 60 detik; collector tetap berjalan. Grafik manual menolak histori berlubang dan data basi berdasarkan interval yang dipilih.
+Timestamp gambar tetap perlu dibaca.
 
 Perubahan state dan nomor update disimpan sebelum balasan dikirim. Jika jaringan gagal,
 perintah bisa sudah berlaku meski balasan tidak sampai: cek `/status` dan `/settings`.
@@ -93,3 +96,23 @@ notifikasi bisa hilang. Pesan lama tidak dikirim sebagai transaksi baru.
 chat/perangkat Telegram sebagai akses kontrol akun demo. Token dan detail error jaringan
 tidak dicetak ke chat/log. Riwayat pengaturan lokal bukan pengganti backup privat.
 Tes lokal memakai Telegram tiruan; aktivasi/pengiriman pada chat pengguna belum diverifikasi.
+
+## Coin dan timeframe grafik
+
+Contoh: `/chart BTC 1m`, `/chart ethereum 15m`, `/chart SOLUSDT 1h`,
+`/chart ETH/BTC 4h`, `/chart BTC 1M`. Tanpa interval, gunakan interval config demo.
+Interval: `1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d 3d 1w 1M`.
+Huruf besar penting: `1m` menit, `1M` bulan kalender.
+
+Ticker dan pair mengikuti katalog Binance Spot aktif; nama umum seperti bitcoin,
+ethereum, solana, dogecoin juga dikenali. Nama lengkap semua token belum tersedia:
+gunakan ticker jika nama tidak dikenali. Coin tanpa pair USDT meminta pilihan pair
+bila ada beberapa pasangan. `/coins SOL` mencari pasangan, `/eligible` menampilkan
+universe trading akun. Tidak mencakup crypto yang tidak terdaftar di Binance Spot.
+
+Grafik mengambil hingga 500 candle publik dan menggambar candle tertutup terbaru
+sebanyak `candle_alerts.bars`. Tidak meminta API key exchange, tidak menyimpan hasil
+on-demand ke dataset strategi. Coin baru dengan kurang dari dua candle ditolak.
+Interval grafik tidak mengubah timeframe strategi, watchlist, atau izin auto-buy.
+`/watch BTC ethereum` dan `/tradecoins BTC` menerima alias tetapi tetap hanya eligible.
+Grafik manual juga bisa melihat pair yang tidak lolos filter trading.

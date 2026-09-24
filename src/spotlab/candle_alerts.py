@@ -23,7 +23,7 @@ class TelegramSecrets(BaseSettings):
     telegram_chat_id: str = ""
 
 
-def candle_png(frame, symbol, interval, fast=9, slow=21, bars=60):
+def candle_png(frame, symbol, interval, fast=9, slow=21, bars=60, quote_asset="USDT"):
     """Render supplied closed history; no network, balances or account identifiers."""
     if len(frame) < 2:
         raise ValueError("Need at least two closed candles")
@@ -54,7 +54,7 @@ def candle_png(frame, symbol, interval, fast=9, slow=21, bars=60):
     price.plot(tail.index, tail.fast, label=f"EMA {fast}", color="#386be0", linewidth=1)
     price.plot(tail.index, tail.slow, label=f"EMA {slow}", color="#b46c13", linewidth=1)
     price.legend(loc="upper left")
-    price.set_ylabel("Price (USDT)")
+    price.set_ylabel(f"Price ({quote_asset})")
     volume.set_ylabel("Volume")
     ticks = sorted(set([0, len(tail) // 3, 2 * len(tail) // 3, len(tail) - 1]))
     volume.set_xticks(ticks, [tail.open_time.iloc[i].strftime("%m-%d\n%H:%M") for i in ticks])

@@ -32,8 +32,9 @@ Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo
 
 ## Kontrol lewat Telegram
 
-Lihat coin dan status, pilih gambar dengan `/watch BTCUSDT ETHUSDT`, minta `/chart BTCUSDT`,
-dan atur entry demo dengan `/tradecoins` serta `/auto on|off`. Perintah hanya diterima
+Cari coin lewat `/coins bitcoin`, lihat daftar trading lewat `/eligible`, pilih gambar
+dengan `/watch BTC ETH`, minta `/chart bitcoin 15m` atau `/chart ETH/BTC 4h`,
+lihat timeframe lewat `/intervals`, dan atur entry demo dengan `/tradecoins` serta `/auto on|off`. Perintah hanya diterima
 dari chat pribadi pemilik yang dikonfigurasi. Akun belajar tetap tanpa order; filter
 kualitas, SL/TP dan risk halt tetap berlaku. [Panduan kontrol Telegram](docs/TELEGRAM_CONTROL.md).
 Tidak ada jaminan coin bebas manipulasi atau harga terus naik.
