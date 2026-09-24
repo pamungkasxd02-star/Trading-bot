@@ -49,3 +49,12 @@ risk:
 runtime:
   max_signal_age_seconds: 30
   max_signal_price_drift_bps: 20
+
+# Aktifkan setelah mengisi dua secret Telegram secara privat.
+candle_alerts:
+  enabled: false
+  setups_only: true
+  symbols: []
+  bars: 60
+  min_interval_seconds: 60
+  symbol_cooldown_seconds: 900

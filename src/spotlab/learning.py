@@ -75,6 +75,7 @@ class DemoAccount:
                 );
                 CREATE INDEX IF NOT EXISTS demo_kind ON demo_records(kind, id);
                 CREATE INDEX IF NOT EXISTS demo_symbol_kind ON demo_records(kind, symbol, id);
+                CREATE INDEX IF NOT EXISTS demo_time_kind ON demo_records(kind, timestamp, id);
             """)
 
     @contextmanager
@@ -661,6 +662,18 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
                 "Warmup demo tidak cukup untuk indikator harian; pilih interval lebih besar"
             )
     account = DemoAccount(config)
+    alerts = None
+    if config.candle_alerts.enabled:
+        from spotlab.candle_alerts import CandleAlerts, TelegramSecrets
+        from spotlab.notifier import TelegramNotifier
+
+        credentials = TelegramSecrets()
+        if not credentials.telegram_bot_token or not credentials.telegram_chat_id:
+            raise ValueError("Isi TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID secara privat dahulu")
+        alerts = CandleAlerts(
+            account,
+            TelegramNotifier(credentials.telegram_bot_token, credentials.telegram_chat_id, True),
+        )
     account.start()
     client = PublicMarketClient(timeout=config.exchange.rest_timeout_seconds)
     stop = asyncio.Event()
@@ -779,6 +792,14 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
                     failures = 0
                 await pause(min(60, config.demo.quote_seconds * 2 ** min(failures, 4)))
 
+        async def alert_loop():
+            while not stop.is_set():
+                try:
+                    await asyncio.to_thread(alerts.tick)
+                except Exception:
+                    LOGGER.warning("Candle alert worker failed; details hidden to protect secrets")
+                await pause(5)
+
         async def repair_loop():
             while not stop.is_set():
                 await pause(config.demo.repair_seconds)
@@ -789,6 +810,8 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
         tasks.extend(
             asyncio.create_task(guard(c)) for c in (collect(), quote_loop(), repair_loop())
         )
+        if alerts is not None:
+            tasks.append(asyncio.create_task(guard(alert_loop())))
         if duration_seconds is not None:
             tasks.append(asyncio.create_task(deadline()))
         await stop.wait()

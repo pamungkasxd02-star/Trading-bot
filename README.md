@@ -30,6 +30,14 @@ order virtual dan tidak otomatis melatih AI.
 Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo-signals`.
 [Panduan belajar candle](docs/CANDLE_STUDY.md) menjelaskan tiap indikator dan batasannya.
 
+## Candle ke Telegram
+
+Grafik candle + EMA + volume dan alasan setup dapat dikirim oleh collector demo/belajar.
+Aktifkan `candle_alerts.enabled` setelah menyimpan token/chat ID secara privat.
+Tersedia cooldown per coin, batas frekuensi, deteksi sinyal basi, status pengiriman,
+dan preview PNG lokal. Lihat [panduan Telegram candle](docs/TELEGRAM_CANDLES.md).
+Pengiriman nyata belum diuji pada chat pengguna; fitur ini mati secara default.
+
 ## Mulai dari demo tanpa API key
 
 Di [GitHub Codespaces](docs/CODESPACES.md), tunggu setup selesai lalu jalankan:

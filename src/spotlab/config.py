@@ -190,7 +190,17 @@ class DemoConfig(StrictModel):
     kill_switch_file: Path = Path("data/DEMO_STOP_TRADING")
 
 
+class CandleAlertsConfig(StrictModel):
+    enabled: bool = False
+    setups_only: bool = True
+    symbols: list[str] = Field(default_factory=list)
+    bars: int = Field(60, ge=20, le=150)
+    min_interval_seconds: int = Field(60, ge=30, le=86400)
+    symbol_cooldown_seconds: int = Field(900, ge=60, le=86400)
+
+
 class AppConfig(StrictModel):
+    candle_alerts: CandleAlertsConfig = CandleAlertsConfig()
     exchange: ExchangeConfig = ExchangeConfig()
     data: DataConfig = DataConfig()
     universe: UniverseConfig = UniverseConfig()

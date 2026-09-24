@@ -45,6 +45,11 @@ def parser() -> argparse.ArgumentParser:
         "demo-signals", help="Analisis candle terakhir tiap coin; bukan order"
     )
     demo_signals.add_argument("--limit", type=int, default=100)
+    demo_chart = commands.add_parser(
+        "demo-chart", help="Preview PNG candle lokal tanpa mengirim Telegram"
+    )
+    demo_chart.add_argument("--symbol", required=True)
+    demo_chart.add_argument("--output", default="exports/candle-preview.png")
     commands.add_parser(
         "demo-stop-trading", help="Hentikan trading virtual; data tetap dikumpulkan"
     )
@@ -226,6 +231,28 @@ def _dispatch(args: argparse.Namespace) -> None:
                 raise SystemExit(2)
         elif args.command == "demo-export":
             print(account.export(args.output).resolve())
+        elif args.command == "demo-chart":
+            import time
+
+            from spotlab.candle_alerts import candle_png
+
+            frame = account.market.load_candles(
+                args.symbol.upper(), config.demo.interval, limit=config.demo.warmup_bars
+            )
+            if not frame.empty:
+                frame = frame[frame.close_time.astype("int64") / 1e9 < time.time()]
+            png = candle_png(
+                frame,
+                args.symbol.upper(),
+                config.demo.interval,
+                config.strategy.ema_fast,
+                config.strategy.ema_slow,
+                config.candle_alerts.bars,
+            )
+            output = Path(args.output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(png)
+            print(output.resolve())
         elif args.command == "demo-signals":
             print(json.dumps(account.signals(args.limit), indent=2))
         elif args.command == "demo-universe":
