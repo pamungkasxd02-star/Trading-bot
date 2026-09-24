@@ -67,3 +67,14 @@ def test_all_scanner_accepts_unfamiliar_liquid_coin_without_top_cap():
     selected, rejected = select_universe(cfg, info, tickers, books)
     assert {s.symbol for s in selected} == {"BTCUSDT", "EXAMPLEUSDT"}
     assert rejected == [{"symbol": "ILLIQUIDUSDT", "reason": "insufficient_quote_volume"}]
+
+
+def test_candle_ratios_and_entry_explanations_match_strategy():
+    cfg = load_config("config/candle-study.yaml")
+    result = CurveScalpingStrategy(cfg.strategy).prepare(candles())
+    ratios = result[["body_ratio", "upper_wick_ratio", "lower_wick_ratio"]]
+    assert np.allclose(ratios.sum(axis=1), 1)
+    checks = result.filter(regex="^check_")
+    assert len(checks.columns) == 5
+    assert (checks.all(axis=1) == result.enter_long).all()
+    assert cfg.demo.analysis_only and cfg.universe.mode == "all"

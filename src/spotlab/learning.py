@@ -52,6 +52,8 @@ def fingerprint(config: AppConfig) -> str:
         "max_signal_age": config.runtime.max_signal_age_seconds,
         "max_signal_drift": config.runtime.max_signal_price_drift_bps,
     }
+    if config.demo.analysis_only:
+        payload["analysis_only"] = True
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
@@ -72,6 +74,7 @@ class DemoAccount:
                     symbol TEXT NOT NULL, payload TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS demo_kind ON demo_records(kind, id);
+                CREATE INDEX IF NOT EXISTS demo_symbol_kind ON demo_records(kind, symbol, id);
             """)
 
     @contextmanager
@@ -90,6 +93,7 @@ class DemoAccount:
             raise ValueError("Saldo virtual harus positif dan finite")
         state = {
             "name": self.config.demo.name,
+            "analysis_only": self.config.demo.analysis_only,
             "mode": "demo",
             "initial_cash": amount,
             "cash": amount,
@@ -264,6 +268,38 @@ class DemoAccount:
         )
         return state
 
+    def signals(self, limit: int = 100):
+        if not 1 <= limit <= 2000:
+            raise ValueError("limit harus 1-2000")
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT symbol,timestamp,payload FROM demo_records WHERE id IN "
+                "(SELECT max(id) FROM demo_records WHERE kind='signal' GROUP BY symbol) "
+                "ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            payload = json.loads(row["payload"])
+            age = time.time() - payload["close_time"] / 1000
+            fresh = 0 < age <= self.config.runtime.max_signal_age_seconds
+            result.append(
+                {
+                    **payload,
+                    "symbol": row["symbol"],
+                    "recorded_at": row["timestamp"],
+                    "age_seconds": age,
+                    "fresh_now": fresh,
+                    "assessment": "stale"
+                    if not fresh
+                    else "setup_detected"
+                    if payload["enter_long"] and not payload["exit_long"]
+                    else "wait",
+                    "is_order": False,
+                }
+            )
+        return result
+
     def export(self, output: str | Path):
         output = Path(output)
         output.mkdir(parents=True, exist_ok=True)
@@ -330,11 +366,21 @@ class DemoEngine:
                     "adx",
                     "atr_pct",
                     "relative_volume",
+                    "body_ratio",
+                    "upper_wick_ratio",
+                    "lower_wick_ratio",
                 )
                 if key in row and pd.notna(row[key]) and math.isfinite(float(row[key]))
             }
+            row_keys = row.keys()  # Supports both pandas Series and dict rows.
+            payload["entry_checks"] = {
+                key.removeprefix("check_"): bool(row[key])
+                for key in row_keys
+                if key.startswith("check_")
+            }
+            payload["candle_direction"] = str(row.get("candle_direction", "unknown"))
             self.account.record(conn, "signal", symbol, payload)
-            if fresh:
+            if fresh and not self.config.demo.analysis_only:
                 state["pending"][symbol] = payload
 
     def closed_candle(self, symbol, candle):
@@ -468,6 +514,7 @@ class DemoEngine:
                     )
             if (
                 not state["position"]
+                and not self.config.demo.analysis_only
                 and not state["halt_reason"]
                 and now >= state["cooldown_until"]
             ):

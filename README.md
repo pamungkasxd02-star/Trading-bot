@@ -20,6 +20,16 @@ Codespace lama, memastikan port **Private**, dan menyimpan backup dengan aman.
 Perubahan kode tidak membuktikan pengaturan instance lama sudah diterapkan atau
 bahwa tidak pernah terjadi kebocoran. Laporan riset historis di repo tetap publik.
 
+## Belajar candle semua coin tanpa order
+
+Jalankan `bash scripts/candle-study.sh` untuk akun analisis terpisah. Scanner mempelajari
+pair Binance Spot/USDT yang lolos filter; ia mencatat badan/sumbu candle, tren, pullback,
+konfirmasi pemulihan dan alasan syarat entry lolos atau ditolak. Mode ini tidak membuka
+order virtual dan tidak otomatis melatih AI.
+
+Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo-signals`.
+[Panduan belajar candle](docs/CANDLE_STUDY.md) menjelaskan tiap indikator dan batasannya.
+
 ## Mulai dari demo tanpa API key
 
 Di [GitHub Codespaces](docs/CODESPACES.md), tunggu setup selesai lalu jalankan:

@@ -41,6 +41,10 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("demo-status", help="Saldo virtual, posisi, data, dan statistik demo")
     commands.add_parser("demo-health", help="Status data real-time; exit 2 jika stale/offline")
     commands.add_parser("demo-universe", help="Pair terpilih/ditolak dan alasan filter demo")
+    demo_signals = commands.add_parser(
+        "demo-signals", help="Analisis candle terakhir tiap coin; bukan order"
+    )
+    demo_signals.add_argument("--limit", type=int, default=100)
     commands.add_parser(
         "demo-stop-trading", help="Hentikan trading virtual; data tetap dikumpulkan"
     )
@@ -222,6 +226,8 @@ def _dispatch(args: argparse.Namespace) -> None:
                 raise SystemExit(2)
         elif args.command == "demo-export":
             print(account.export(args.output).resolve())
+        elif args.command == "demo-signals":
+            print(json.dumps(account.signals(args.limit), indent=2))
         elif args.command == "demo-universe":
             snapshot = account.market.metadata("learning_universe")
             if not snapshot:

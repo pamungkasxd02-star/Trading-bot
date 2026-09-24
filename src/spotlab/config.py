@@ -178,6 +178,7 @@ class RuntimeConfig(StrictModel):
 
 
 class DemoConfig(StrictModel):
+    analysis_only: bool = False
     database: Path = Path("data/learning.db")
     name: str = Field("Belajar", min_length=1, max_length=60)
     initial_cash: float = Field(1000, gt=0)

@@ -20,6 +20,17 @@ class CurveScalpingStrategy(QualityCrossStrategy):
             / frame["atr"].where(frame["atr"] > 0)
         ).fillna(0)
         span = frame["high"] - frame["low"]
+        safe_span = span.where(span > 0)
+        frame["body_ratio"] = ((frame["close"] - frame["open"]).abs() / safe_span).fillna(0)
+        frame["upper_wick_ratio"] = (
+            (frame["high"] - frame[["open", "close"]].max(axis=1)) / safe_span
+        ).fillna(0)
+        frame["lower_wick_ratio"] = (
+            (frame[["open", "close"]].min(axis=1) - frame["low"]) / safe_span
+        ).fillna(0)
+        frame["candle_direction"] = "flat"
+        frame.loc[frame["close"].gt(frame["open"]), "candle_direction"] = "bullish"
+        frame.loc[frame["close"].lt(frame["open"]), "candle_direction"] = "bearish"
         frame["close_location"] = ((frame["close"] - frame["low"]) / span.where(span > 0)).fillna(0)
         trend = (
             frame["ema_fast"].gt(frame["ema_slow"])
@@ -46,6 +57,14 @@ class CurveScalpingStrategy(QualityCrossStrategy):
             & frame["entry_quality_ok"]
             & frame["signal_score"].ge(cfg.min_reversion_score)
         )
+        for name, condition in {
+            "trend": trend,
+            "pullback": pullback,
+            "recovery": recovery,
+            "quality": frame["entry_quality_ok"],
+            "score": frame["signal_score"].ge(cfg.min_reversion_score),
+        }.items():
+            frame["check_" + name] = condition.fillna(False)
         frame["exit_long"] |= frame["close"].lt(frame["ema_slow"])
         frame["signal_reason"] = "hold:curve_or_recovery_filter"
         frame.loc[frame["enter_long"], "signal_reason"] = (

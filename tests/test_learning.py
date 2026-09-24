@@ -394,3 +394,40 @@ def test_repair_stops_between_pairs_and_propagates_internal_error(demo, monkeypa
     monkeypatch.setattr(learning, "fetch_history", broken)
     with pytest.raises(RuntimeError, match="pagination failed"):
         learning.repair_demo_history(account, None, ["BTCUSDT"])
+
+
+def test_analysis_only_logs_buy_setup_but_cannot_create_order(demo):
+    account, engine = demo
+    account.config.demo.analysis_only = True
+    row = entry_row(
+        check_trend=True, check_pullback=False, body_ratio=0.7, candle_direction="bullish"
+    )
+    engine.signal("BTCUSDT", row)
+    engine.quotes(quote())
+    result = account.status()
+    assert result["position"] is None
+    assert result["cash"] == 1000
+    assert result["records"].get("order", 0) == 0
+    signal = account.signals()[0]
+    assert signal["assessment"] == "setup_detected"
+    assert signal["entry_checks"] == {"trend": True, "pullback": False}
+    assert signal["diagnostics"]["body_ratio"] == 0.7
+    assert signal["is_order"] is False
+    # Inspecting a once-fresh signal later cannot report it as a current setup.
+    with account.connect() as conn:
+        payload = json.loads(
+            conn.execute("SELECT payload FROM demo_records WHERE kind='signal'").fetchone()[0]
+        )
+        payload["close_time"] -= 3600000
+        conn.execute(
+            "UPDATE demo_records SET payload=? WHERE kind='signal'", (json.dumps(payload),)
+        )
+    assert account.signals()[0]["assessment"] == "stale"
+
+
+def test_analysis_mode_cannot_be_changed_on_existing_account(demo):
+    account, _ = demo
+    account.stop()
+    account.config.demo.analysis_only = True
+    with pytest.raises(RuntimeError, match="Konfigurasi berubah"):
+        account.start()
