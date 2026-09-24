@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from spotlab.candle_alerts import candle_png
 from spotlab.candle_analysis import analysis_report
 from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selected_symbol
+from spotlab.telegram_diagnostics import position_report, why_report
 from spotlab.telegram_menu import DEMO_ROWS, GUIDE, MAIN_ROWS, keyboard, route
 
 HELP = (
@@ -157,6 +158,8 @@ class TelegramControl:
                 "/eligible",
                 "/intervals",
                 "/analyze",
+                "/why",
+                "/position",
             }:
                 reply = (command, args)
             else:
@@ -170,6 +173,8 @@ class TelegramControl:
                 reply = str(exc)
             except Exception:
                 reply = "Data/layanan belum tersedia. Coba lagi; detail jaringan tidak ditampilkan."
+        if reply is None and markup is not None:
+            reply = "Selesai. Pilih menu untuk lanjut."
         if reply:
             if markup is not None:
                 self.notifier.send(reply[:3900], reply_markup=markup)
@@ -178,6 +183,10 @@ class TelegramControl:
 
     def read_command(self, command, args):
         account = self.account
+        if command == "/why":
+            return why_report(account)
+        if command == "/position":
+            return position_report(account)
         if command == "/guide":
             return GUIDE
         if command in {"/start", "/menu", "/demo"}:

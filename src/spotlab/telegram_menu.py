@@ -1,10 +1,15 @@
 """Owner-only reply keyboard and short-lived guided input."""
 
+import re
+
+from spotlab.market_charts import INTERVALS
+
 MAIN_ROWS = [
     ["Status akun", "Cara pakai"],
     ["Cari coin", "Lihat candle"],
     ["Analisis coin", "Sinyal terbaru"],
     ["Atur demo", "Pengaturan"],
+    ["Kenapa belum buy?", "Posisi aktif"],
 ]
 DEMO_ROWS = [
     ["Coin eligible", "Pilih coin demo"],
@@ -14,6 +19,8 @@ DEMO_ROWS = [
 ]
 BUTTONS = {
     "Status akun": "/status",
+    "Kenapa belum buy?": "/why",
+    "Posisi aktif": "/position",
     "Cara pakai": "/guide",
     "Sinyal terbaru": "/signals",
     "Atur demo": "/demo",
@@ -34,7 +41,7 @@ PROMPTS = {
     "Lihat candle": (
         "/chart",
         "Ketik coin dan interval, misalnya BTC 15m atau ETHUSDT 1h.\n"
-        "Tanpa interval memakai timeframe akun. /intervals untuk daftar.",
+        "Coin saja membuka pilihan timeframe berikutnya.",
     ),
     "Analisis coin": (
         "/analyze",
@@ -55,7 +62,7 @@ GUIDE = (
     "1. Status akun: lihat koneksi/data, saldo virtual, posisi dan hasil trade.\n"
     "2. Cari coin: temukan pair Binance Spot.\n"
     "3. Lihat candle: tekan tombol lalu ketik BTC 15m untuk gambar.\n"
-    "4. Analisis coin: ketik BTC untuk membandingkan beberapa timeframe.\n"
+    "4. Analisis coin: pilih coin, lalu preset Scalping/Intraday/Swing.\n"
     "5. Atur demo: pilih coin eligible dan jeda/aktifkan entry otomatis.\n\n"
     "Demo memakai saldo virtual. Akun belajar hanya menganalisis; tidak bisa buy. "
     "Auto-buy menunggu sinyal yang lolos filter, bukan membeli setiap harga naik. "
@@ -75,21 +82,58 @@ def keyboard(rows):
     )
 
 
+COIN_ROWS = [["BTC", "ETH", "SOL"], ["Batal"]]
+TIME_ROWS = [["1m", "5m", "15m"], ["1h", "4h", "1d"], ["Kembali", "Batal"]]
+ANALYSIS_ROWS = [["Scalping", "Intraday", "Swing"], ["Kembali", "Batal"]]
+PRESETS = {"Scalping": "1m 5m 15m", "Intraday": "15m 1h 4h", "Swing": "4h 1d 1w"}
+
+
 def route(text, control, now):
     """Return command text, optional prompt, optional keyboard. Called after auth."""
     text = text.strip()
+    if not text:
+        return "", "Kirim teks atau pilih tombol.", keyboard(MAIN_ROWS)
     if text in PROMPTS:
         command, prompt = PROMPTS[text]
         control["menu_prompt"] = dict(command=command, expires=now + 300)
-        return "", prompt + "\nBerlaku 5 menit. Tekan Batal untuk kembali.", keyboard([["Batal"]])
+        rows = COIN_ROWS if command in {"/chart", "/analyze"} else [["Batal"]]
+        return "", prompt + "\nPilih/ketik coin. Berlaku 5 menit.", keyboard(rows)
     if text in BUTTONS:
         text = BUTTONS[text]
     if text.startswith("/"):
         control.pop("menu_prompt", None)
         return text, None, None
-    pending = control.pop("menu_prompt", None)
-    if pending and now <= pending["expires"]:
-        return pending["command"] + " " + text, None, keyboard(MAIN_ROWS)
-    if pending:
+    pending = control.get("menu_prompt")
+    if pending and now > pending["expires"]:
+        control.pop("menu_prompt", None)
         return "", "Pilihan kedaluwarsa. Pilih tombol lagi.", keyboard(MAIN_ROWS)
+    if pending:
+        command = pending["command"]
+        if text == "Kembali":
+            pending.pop("coin", None)
+            return "", "Pilih atau ketik coin lagi.", keyboard(COIN_ROWS)
+        if command in {"/chart", "/analyze"}:
+            if "coin" not in pending:
+                parts = text.split()
+                if not re.fullmatch(r"[A-Za-z0-9/-]{1,40}", parts[0]):
+                    return "", "Gunakan ticker seperti BTC atau pair ETH/USDT.", keyboard(COIN_ROWS)
+                coin, intervals = parts[0], parts[1:]
+                if not intervals:
+                    pending["coin"] = coin
+                    rows = TIME_ROWS if command == "/chart" else ANALYSIS_ROWS
+                    hint = (
+                        "interval, misalnya 15m" if command == "/chart" else "preset atau 1m 5m 15m"
+                    )
+                    return "", f"Coin: {coin}. Pilih {hint}.", keyboard(rows)
+            else:
+                coin = pending["coin"]
+                intervals = (PRESETS.get(text, text) if command == "/analyze" else text).split()
+            limit = 1 if command == "/chart" else 4
+            if not 1 <= len(intervals) <= limit or any(i not in INTERVALS for i in intervals):
+                pending["coin"] = coin
+                rows = TIME_ROWS if command == "/chart" else ANALYSIS_ROWS
+                return "", f"Pilih 1-{limit} interval valid. " + " ".join(INTERVALS), keyboard(rows)
+            text = coin + " " + " ".join(intervals)
+        control.pop("menu_prompt", None)
+        return command + " " + text, None, keyboard(MAIN_ROWS)
     return "/menu", None, None

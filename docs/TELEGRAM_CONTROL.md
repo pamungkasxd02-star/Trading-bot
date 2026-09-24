@@ -33,9 +33,10 @@ atau update yang sudah diproses diabaikan. Pada awal polling, backlog lama dilew
 ## Mulai tanpa menghafal command
 
 1. Kirim `/start`: bot menjelaskan mode akun dan menampilkan tombol.
-2. Tekan **Lihat candle**, lalu ketik `BTC 15m` untuk grafik. Coin saja menggunakan
-   interval akun; contoh pair lengkap `ETHUSDT 1h` juga diterima.
-3. Tekan **Analisis coin**, lalu ketik `SOL` atau `BTC 1m 5m 15m`.
+2. Tekan **Lihat candle**, lalu ketik `BTC 15m` untuk grafik. Coin saja membuka
+   pilihan timeframe; contoh pair lengkap `ETHUSDT 1h` juga diterima.
+3. Tekan **Analisis coin**, ketik `SOL`, lalu pilih preset **Scalping**, **Intraday**
+   atau **Swing**. Input lengkap `BTC 1m 5m 15m` juga diterima.
 4. Tekan **Cari coin**, lalu ketik `USDT`, `SOL`, atau `bitcoin`.
 5. Tekan **Status akun** untuk hasil virtual; **Cara pakai** menjelaskan istilahnya.
 6. **Atur demo** membuka kontrol entry, daftar eligible dan notifikasi otomatis.
@@ -44,6 +45,10 @@ Tombol tampil sebagai keyboard di bawah kolom pesan. Bila tersembunyi, tekan iko
 keyboard Telegram atau kirim `/menu`. Command lama tetap berfungsi. Balasan input
 berlaku lima menit, hanya untuk pemilik chat; **Batal**, **Menu utama** atau command
 baru membatalkan permintaan input sebelumnya. Jika salah input, pilih tombol lagi.
+Saat memilih timeframe, **Kembali** mengganti coin; **Batal** membuka menu utama.
+Interval tidak valid tetap berada di langkah pemilihan agar bisa diperbaiki. Deadline
+lima menit dihitung dari mulai alur, tidak diperpanjang oleh input berulang.
+Sesudah grafik terkirim, menu utama ditampilkan kembali.
 Setelah restart bot, gunakan `/menu` untuk memulai kembali dengan jelas.
 
 `/start` tidak menyalakan atau mematikan auto-buy. Tombol **Aktifkan auto-buy demo**
@@ -68,6 +73,8 @@ Selama proses berhenti, posisi demo tidak dikelola.
 | `/start` atau `/menu` | Menu tombol dan penjelasan mode akun |
 | `/guide` | Panduan pemula |
 | `/demo` | Menu kontrol akun demo |
+| `/why` | Pemeriksaan mode, pause, data, posisi dan setup entry |
+| `/position` | Entry, quantity, waktu entry, SL/TP posisi demo |
 
 
 | Perintah | Hasil |
@@ -187,3 +194,32 @@ Permintaan jaringan lambat dapat menunda balasan command berikutnya.
 Keselarasan tren adalah ringkasan aturan, bukan skor probabilitas, rekomendasi buy,
 atau bukti peningkatan win rate. Perintah ini tidak mengubah auto-buy, pending order,
 strategi, watchlist atau gate live. Tetap uji strategi lewat backtest dan paper trading.
+
+## Pilihan timeframe dan diagnosis
+
+Preset menu **Analisis coin** hanya memilih interval laporan:
+
+| Preset | Timeframe |
+| --- | --- |
+| Scalping | 1m, 5m, 15m |
+| Intraday | 15m, 1h, 4h |
+| Swing | 4h, 1d, 1w |
+
+Preset tidak mengganti strategi atau mode trading. Semua interval yang didukung
+juga bisa diketik manual; `1M` bulan berbeda dari `1m` menit. Shortcut command
+langsung `/chart BTC` tetap memakai interval akun; pemilihan bertahap berlaku saat
+masuk lewat tombol **Lihat candle**. `/analyze BTC` tetap memakai default config.
+
+**Kenapa belum buy?** menampilkan pemeriksaan akun berdasarkan state saat dibaca:
+mode belajar, auto entry dijeda, risk halt/kill-switch, heartbeat, kesehatan data,
+posisi terbuka, dan hitungan analisis/sinyal segar dalam pilihan coin entry. Data
+sinyal dibatasi maksimal 2000 coin terbaru, bukan pemindaian baru ke exchange.
+Riwayat `entry_skipped` dicari dalam 200 event terakhir dan diberi timestamp;
+kejadian lama tidak dianggap alasan penolakan saat ini. Detail error jaringan tidak
+dikirim. Laporan ini tidak merekonstruksi setiap keputusan engine atau menjamin
+order ketika semua pemeriksaan terlihat baik.
+
+**Posisi aktif** menampilkan ukuran, entry, SL dan TP dari posisi virtual yang
+tersimpan. Bukan order proteksi di exchange: bot harus berjalan dan menerima harga
+untuk mengelolanya. Semua menu diagnosis hanya membaca data, tidak reset halt atau
+mengubah posisi, sinyal, dan auto-buy.

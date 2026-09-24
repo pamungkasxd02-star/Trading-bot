@@ -664,3 +664,57 @@ def test_menu_auto_button_respects_study_gate(demo):
     bot.process(command_update("Aktifkan auto-buy demo", uid=2))
     assert "tidak bisa order" in sender.sent[-1]
     assert account.status()["telegram_control"]["auto"] is False
+
+
+def test_diagnostics_and_position_describe_state_without_mutation(demo):
+    from spotlab.telegram_diagnostics import position_report, why_report
+
+    account, engine = demo
+    with account.edit() as (_, state):
+        state.setdefault("telegram_control", {})["auto"] = False
+    account.config.demo.analysis_only = True
+    report = why_report(account)
+    assert "Mode belajar" in report and "dijeda" in report
+    assert "Belum ada posisi" in position_report(account)
+    account.config.demo.analysis_only = False
+    with account.edit() as (_, state):
+        state["telegram_control"]["auto"] = True
+    engine.signal("BTCUSDT", entry_row())
+    engine.quotes(quote())
+    assert "batas satu posisi" in why_report(account)
+    report = position_report(account)
+    assert "Stop-loss:" in report and "take-profit:" in report
+    assert account.status()["position"]["symbol"] == "BTCUSDT"
+
+
+def test_diagnostics_skip_history_does_not_expose_unknown_error(demo):
+    from spotlab.telegram_diagnostics import why_report
+
+    account, _ = demo
+    with account.edit() as (conn, _):
+        account.record(
+            conn,
+            "event",
+            "BTCUSDT",
+            {"event": "entry_skipped", "reason": "private-token-network-error"},
+        )
+    report = why_report(account)
+    assert "private-token" not in report
+    assert "bisa sudah lama" in report
+
+
+def test_photo_wizard_restores_main_keyboard(demo, monkeypatch):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    calls = []
+    monkeypatch.setattr(bot, "read_command", lambda cmd, args: calls.append((cmd, args)))
+    bot.process(command_update("Lihat candle"))
+    bot.process(command_update("BTC", uid=2))
+    assert not calls
+    bot.process(command_update("15m", uid=3))
+    assert calls == [("/chart", ["BTC", "15m"])]
+    assert "Selesai" in sender.sent[-1]
+    assert "Lihat candle" in str(sender.markup)

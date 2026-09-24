@@ -34,7 +34,10 @@ Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo
 
 **Mulai dengan `/start` atau `/menu`.** Tombol muncul di area keyboard Telegram.
 Tekan **Cara pakai** untuk panduan pemula, **Lihat candle** lalu balas `BTC 15m`,
-atau **Analisis coin** lalu balas `SOL`. **Status akun** menampilkan akun virtual;
+atau **Analisis coin**, pilih `SOL`, lalu preset **Scalping**, **Intraday**, atau **Swing**.
+Coin saja pada **Lihat candle** membuka tombol timeframe. **Kenapa belum buy?**
+memeriksa mode akun, data dan sinyal; **Posisi aktif** menunjukkan entry/SL/TP virtual.
+**Status akun** menampilkan akun virtual;
 **Atur demo** berisi pemilihan coin dan kontrol auto-buy. Membuka menu tidak
 mengubah status trading. Jika tombol tersembunyi, tekan ikon keyboard atau `/menu`.
 
