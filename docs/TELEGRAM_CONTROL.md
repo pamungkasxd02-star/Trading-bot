@@ -21,7 +21,7 @@ candle_alerts:
 
 Gunakan `config/all-scalping-demo.yaml` dan `bash scripts/all-scalping-demo.sh` untuk
 simulasi auto-buy. `config/candle-study.yaml` tetap khusus analisis dan menolak `/auto on`.
-Tunggu bootstrap/collector siap, lalu kirim `/help` ke bot. Gunakan satu bot Telegram
+Tunggu bootstrap/collector siap, lalu kirim `/start` ke bot. Gunakan satu bot Telegram
 khusus untuk satu collector aktif: dua proses yang memanggil getUpdates akan bersaing.
 Webhook yang sudah dipakai aplikasi lain perlu ditinjau sendiri; kode tidak menghapusnya.
 
@@ -30,7 +30,45 @@ seperti `TELEGRAM_CHAT_ID`. Grup/channel tidak didukung untuk kontrol. Jangan me
 username sebagai ID kontrol. Semua pesan sebelum startup, lebih dari dua menit,
 atau update yang sudah diproses diabaikan. Pada awal polling, backlog lama dilewati.
 
-## Menu
+## Mulai tanpa menghafal command
+
+1. Kirim `/start`: bot menjelaskan mode akun dan menampilkan tombol.
+2. Tekan **Lihat candle**, lalu ketik `BTC 15m` untuk grafik. Coin saja menggunakan
+   interval akun; contoh pair lengkap `ETHUSDT 1h` juga diterima.
+3. Tekan **Analisis coin**, lalu ketik `SOL` atau `BTC 1m 5m 15m`.
+4. Tekan **Cari coin**, lalu ketik `USDT`, `SOL`, atau `bitcoin`.
+5. Tekan **Status akun** untuk hasil virtual; **Cara pakai** menjelaskan istilahnya.
+6. **Atur demo** membuka kontrol entry, daftar eligible dan notifikasi otomatis.
+
+Tombol tampil sebagai keyboard di bawah kolom pesan. Bila tersembunyi, tekan ikon
+keyboard Telegram atau kirim `/menu`. Command lama tetap berfungsi. Balasan input
+berlaku lima menit, hanya untuk pemilik chat; **Batal**, **Menu utama** atau command
+baru membatalkan permintaan input sebelumnya. Jika salah input, pilih tombol lagi.
+Setelah restart bot, gunakan `/menu` untuk memulai kembali dengan jelas.
+
+`/start` tidak menyalakan atau mematikan auto-buy. Tombol **Aktifkan auto-buy demo**
+setara `/auto on`; **Jeda auto-buy demo** setara `/auto off`. Tombol tetap tunduk
+pada mode belajar, halt dan kill-switch. Memilih coin demo tidak memaksa pembelian.
+Jeda bukan perintah menutup posisi. Posisi hanya dikelola selama proses berjalan.
+
+## Memuat pembaruan pada proses yang sudah berjalan
+
+Push GitHub tidak memperbarui proses Python yang sedang berjalan. Di terminal repo,
+jalankan `git pull --ff-only`; jika Git menolak karena perubahan lokal, jangan reset
+paksa karena config lokal perlu dipertahankan. Hentikan proses lama secara normal
+(Ctrl+C pada terminal proses), lalu jalankan kembali launcher/config yang sama.
+Jangan jalankan dua collector dengan bot Telegram yang sama. Database dan `.env`
+tetap digunakan; jangan dihapus. Setelah collector siap, kirim `/start` lagi.
+Selama proses berhenti, posisi demo tidak dikelola.
+
+## Menu command
+
+| Perintah | Hasil |
+| --- | --- |
+| `/start` atau `/menu` | Menu tombol dan penjelasan mode akun |
+| `/guide` | Panduan pemula |
+| `/demo` | Menu kontrol akun demo |
+
 
 | Perintah | Hasil |
 | --- | --- |

@@ -439,8 +439,9 @@ class ControlCapture:
     def __init__(self):
         self.sent = []
 
-    def send(self, text):
+    def send(self, text, reply_markup=None):
         self.sent.append(text)
+        self.markup = reply_markup
 
 
 def command_update(text, uid=1, owner=12345, **changes):
@@ -610,3 +611,56 @@ def test_telegram_analyze_routes_config_defaults_without_enabling_orders(demo, m
     assert sender.sent[-1] == "analisis selesai"
     assert account.status()["telegram_control"]["auto"] is False
     assert account.status()["position"] is None
+
+
+def test_start_menu_preserves_auto_and_guided_input(demo, monkeypatch):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("/auto off"))
+    bot.process(command_update("/start", uid=2))
+    assert sender.markup["resize_keyboard"] is True
+    assert "Lihat candle" in str(sender.markup)
+    assert account.status()["telegram_control"]["auto"] is False
+    bot.process(command_update("Lihat candle", uid=3))
+    assert "BTC 15m" in sender.sent[-1]
+    calls = []
+    monkeypatch.setattr(bot, "read_command", lambda cmd, args: calls.append((cmd, args)) or "ok")
+    bot.process(command_update("ETH 1h", uid=4))
+    assert calls == [("/chart", ["ETH", "1h"])]
+    assert "menu_prompt" not in account.status()["telegram_control"]
+    assert account.status()["telegram_control"]["auto"] is False
+
+
+def test_menu_unauthorized_input_cancel_and_expiry(demo, monkeypatch):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("Pilih coin demo", owner=999))
+    assert "menu_prompt" not in account.status()["telegram_control"]
+    bot.process(command_update("Pilih coin demo", uid=2))
+    bot.process(command_update("Batal", uid=3))
+    assert "menu_prompt" not in account.status()["telegram_control"]
+    bot.process(command_update("Lihat candle", uid=4))
+    with account.edit() as (_, state):
+        state["telegram_control"]["menu_prompt"]["expires"] = 0
+    bot.process(command_update("BTC 1m", uid=5))
+    assert "kedaluwarsa" in sender.sent[-1]
+    assert not account.status()["telegram_control"].get("tradecoins")
+
+
+def test_menu_auto_button_respects_study_gate(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    account.config.demo.analysis_only = True
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("Jeda auto-buy demo"))
+    bot.process(command_update("Aktifkan auto-buy demo", uid=2))
+    assert "tidak bisa order" in sender.sent[-1]
+    assert account.status()["telegram_control"]["auto"] is False

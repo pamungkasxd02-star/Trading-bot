@@ -32,6 +32,13 @@ Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo
 
 ## Kontrol lewat Telegram
 
+**Mulai dengan `/start` atau `/menu`.** Tombol muncul di area keyboard Telegram.
+Tekan **Cara pakai** untuk panduan pemula, **Lihat candle** lalu balas `BTC 15m`,
+atau **Analisis coin** lalu balas `SOL`. **Status akun** menampilkan akun virtual;
+**Atur demo** berisi pemilihan coin dan kontrol auto-buy. Membuka menu tidak
+mengubah status trading. Jika tombol tersembunyi, tekan ikon keyboard atau `/menu`.
+
+
 Cari coin lewat `/coins bitcoin`, lihat daftar trading lewat `/eligible`, pilih gambar
 dengan `/watch BTC ETH`, minta `/chart bitcoin 15m` atau `/chart ETH/BTC 4h`,
 lihat timeframe lewat `/intervals`, dan atur entry demo dengan `/tradecoins` serta `/auto on|off`. Perintah hanya diterima

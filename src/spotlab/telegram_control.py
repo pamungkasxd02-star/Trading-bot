@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from spotlab.candle_alerts import candle_png
 from spotlab.candle_analysis import analysis_report
 from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selected_symbol
+from spotlab.telegram_menu import DEMO_ROWS, GUIDE, MAIN_ROWS, keyboard, route
 
 HELP = (
     "/status /health /coins [query] [page] /eligible [page] /signals [COIN] /settings\n"
@@ -67,6 +68,7 @@ class TelegramControl:
         if not isinstance(uid, int):
             return
         reply = None
+        markup = None
         with account.edit() as (_, state):
             control = state.setdefault("telegram_control", {"cursor": -1})
             if uid <= control["cursor"]:
@@ -83,11 +85,20 @@ class TelegramControl:
             ):
                 return
             text = message.get("text", "")[:1024]
+            text, prompt, markup = route(text, control, time.time())
+            if prompt:
+                reply = prompt
+                text = "/_prompt"
             parts = text.strip().split()
             if not parts:
                 return
             command, args = parts[0].lower(), parts[1:]
-            if command in {"/alerts", "/mode"}:
+            if command == "/_prompt":
+                pass
+            elif command in {"/start", "/menu", "/guide", "/demo"}:
+                markup = keyboard(DEMO_ROWS if command == "/demo" else MAIN_ROWS)
+                reply = (command, args)
+            elif command in {"/alerts", "/mode"}:
                 choices = {
                     "/alerts": {"on": True, "off": False},
                     "/mode": {"setups": True, "observe": False},
@@ -160,10 +171,39 @@ class TelegramControl:
             except Exception:
                 reply = "Data/layanan belum tersedia. Coba lagi; detail jaringan tidak ditampilkan."
         if reply:
-            self.notifier.send(reply[:3900])
+            if markup is not None:
+                self.notifier.send(reply[:3900], reply_markup=markup)
+            else:
+                self.notifier.send(reply[:3900])
 
     def read_command(self, command, args):
         account = self.account
+        if command == "/guide":
+            return GUIDE
+        if command in {"/start", "/menu", "/demo"}:
+            status = account.status()
+            study = account.config.demo.analysis_only
+            enabled = status.get("telegram_control", {}).get("auto", True)
+            active = not study and enabled and not status["trading_halted"]
+            mode = "BELAJAR CANDLE (tanpa order)" if study else "DEMO (saldo virtual)"
+            intro = (
+                f"Selamat datang! Mode: {mode}\n"
+                f"Health: {status['health']} | "
+                f"Auto entry diizinkan: {'YA' if active else 'TIDAK'}\n"
+                "Live tidak diaktifkan oleh menu ini.\n\n"
+            )
+            if command == "/demo":
+                return intro + (
+                    "Pilih coin demo membatasi entry baru. Aktifkan auto-buy demo menunggu "
+                    "sinyal yang lolos filter dan batas risiko. Jeda menghentikan entry baru; "
+                    "posisi lama tetap dikelola. Akun belajar menolak aktivasi order."
+                )
+            return intro + (
+                "Mulai dari Lihat candle, lalu ketik BTC 15m.\n"
+                "Analisis coin membandingkan tren beberapa timeframe.\n"
+                "Status akun menunjukkan hasil akun virtual. Atur demo untuk kontrol entry.\n"
+                "Tekan Cara pakai untuk panduan; /menu menampilkan tombol kembali."
+            )
         if command in {"/status", "/health"}:
             s = account.status()
             auto = not account.config.demo.analysis_only and s.get("telegram_control", {}).get(

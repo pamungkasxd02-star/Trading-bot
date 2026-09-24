@@ -19,12 +19,15 @@ class TelegramNotifier:
         self.chat_id = chat_id
         self.enabled = enabled
 
-    def send(self, message: str) -> None:
+    def send(self, message: str, reply_markup: dict | None = None) -> None:
         if not self.enabled:
             return
         if not self.token or not self.chat_id:
             raise RuntimeError("Telegram aktif tetapi token/chat id kosong")
-        body = urlencode({"chat_id": self.chat_id, "text": message}).encode()
+        fields = {"chat_id": self.chat_id, "text": message}
+        if reply_markup is not None:
+            fields["reply_markup"] = json.dumps(reply_markup)
+        body = urlencode(fields).encode()
         request = Request(
             f"https://api.telegram.org/bot{self.token}/sendMessage",
             data=body,
