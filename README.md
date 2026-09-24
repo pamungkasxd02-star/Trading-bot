@@ -32,6 +32,14 @@ Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo
 
 ## Kontrol lewat Telegram
 
+**Daftar strategi** menjelaskan lima teknik yang tersedia. **Cek teknik coin**
+(atau `/techniques SOL 15m`) membandingkan hasil kode strategi pada candle coin
+pilihan: setup, wait, exit, atau data kurang. Ini tidak mengubah strategi aktif
+atau mengaktifkan buy; `/strategies` menampilkan strategi akun saat ini.
+**Rencana entry demo** (`/plan SOL 15m`) menampilkan acuan harga, quantity, SL/TP,
+estimasi PnL setelah fee/slippage dan penghalang entry. Ini simulasi dari close
+candle, bukan harga ask langsung atau order.
+
 **Mulai dengan `/start` atau `/menu`.** Tombol muncul di area keyboard Telegram.
 Tekan **Cara pakai** untuk panduan pemula, **Lihat candle** lalu balas `BTC 15m`,
 atau **Analisis coin**, pilih `SOL`, lalu preset **Scalping**, **Intraday**, atau **Swing**.

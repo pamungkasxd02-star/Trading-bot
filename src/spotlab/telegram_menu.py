@@ -10,6 +10,8 @@ MAIN_ROWS = [
     ["Analisis coin", "Sinyal terbaru"],
     ["Atur demo", "Pengaturan"],
     ["Kenapa belum buy?", "Posisi aktif"],
+    ["Daftar strategi", "Cek teknik coin"],
+    ["Rencana entry demo"],
 ]
 DEMO_ROWS = [
     ["Coin eligible", "Pilih coin demo"],
@@ -19,6 +21,7 @@ DEMO_ROWS = [
 ]
 BUTTONS = {
     "Status akun": "/status",
+    "Daftar strategi": "/strategies",
     "Kenapa belum buy?": "/why",
     "Posisi aktif": "/position",
     "Cara pakai": "/guide",
@@ -34,6 +37,14 @@ BUTTONS = {
     "Batal": "/menu",
 }
 PROMPTS = {
+    "Rencana entry demo": (
+        "/plan",
+        "Pilih coin/timeframe untuk simulasi sizing, SL dan TP. Tidak membuat order.",
+    ),
+    "Cek teknik coin": (
+        "/techniques",
+        "Pilih coin lalu timeframe untuk membandingkan aturan strategi.",
+    ),
     "Cari coin": (
         "/coins",
         "Ketik ticker/nama, misalnya SOL atau bitcoin. Balas USDT untuk pair USDT.",
@@ -96,7 +107,9 @@ def route(text, control, now):
     if text in PROMPTS:
         command, prompt = PROMPTS[text]
         control["menu_prompt"] = dict(command=command, expires=now + 300)
-        rows = COIN_ROWS if command in {"/chart", "/analyze"} else [["Batal"]]
+        rows = (
+            COIN_ROWS if command in {"/chart", "/analyze", "/techniques", "/plan"} else [["Batal"]]
+        )
         return "", prompt + "\nPilih/ketik coin. Berlaku 5 menit.", keyboard(rows)
     if text in BUTTONS:
         text = BUTTONS[text]
@@ -112,7 +125,7 @@ def route(text, control, now):
         if text == "Kembali":
             pending.pop("coin", None)
             return "", "Pilih atau ketik coin lagi.", keyboard(COIN_ROWS)
-        if command in {"/chart", "/analyze"}:
+        if command in {"/chart", "/analyze", "/techniques", "/plan"}:
             if "coin" not in pending:
                 parts = text.split()
                 if not re.fullmatch(r"[A-Za-z0-9/-]{1,40}", parts[0]):
@@ -120,18 +133,24 @@ def route(text, control, now):
                 coin, intervals = parts[0], parts[1:]
                 if not intervals:
                     pending["coin"] = coin
-                    rows = TIME_ROWS if command == "/chart" else ANALYSIS_ROWS
+                    rows = (
+                        TIME_ROWS
+                        if command in {"/chart", "/techniques", "/plan"}
+                        else ANALYSIS_ROWS
+                    )
                     hint = (
-                        "interval, misalnya 15m" if command == "/chart" else "preset atau 1m 5m 15m"
+                        "interval, misalnya 15m"
+                        if command in {"/chart", "/techniques", "/plan"}
+                        else "preset atau 1m 5m 15m"
                     )
                     return "", f"Coin: {coin}. Pilih {hint}.", keyboard(rows)
             else:
                 coin = pending["coin"]
                 intervals = (PRESETS.get(text, text) if command == "/analyze" else text).split()
-            limit = 1 if command == "/chart" else 4
+            limit = 1 if command in {"/chart", "/techniques", "/plan"} else 4
             if not 1 <= len(intervals) <= limit or any(i not in INTERVALS for i in intervals):
                 pending["coin"] = coin
-                rows = TIME_ROWS if command == "/chart" else ANALYSIS_ROWS
+                rows = TIME_ROWS if command in {"/chart", "/techniques", "/plan"} else ANALYSIS_ROWS
                 return "", f"Pilih 1-{limit} interval valid. " + " ".join(INTERVALS), keyboard(rows)
             text = coin + " " + " ".join(intervals)
         control.pop("menu_prompt", None)

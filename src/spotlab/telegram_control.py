@@ -9,7 +9,10 @@ from datetime import UTC, datetime
 
 from spotlab.candle_alerts import candle_png
 from spotlab.candle_analysis import analysis_report
+from spotlab.entry_preview import preview
 from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selected_symbol
+from spotlab.strategy_review import catalogue as strategy_catalogue
+from spotlab.strategy_review import review
 from spotlab.telegram_diagnostics import position_report, why_report
 from spotlab.telegram_menu import DEMO_ROWS, GUIDE, MAIN_ROWS, keyboard, route
 
@@ -160,6 +163,9 @@ class TelegramControl:
                 "/analyze",
                 "/why",
                 "/position",
+                "/strategies",
+                "/techniques",
+                "/plan",
             }:
                 reply = (command, args)
             else:
@@ -183,6 +189,24 @@ class TelegramControl:
 
     def read_command(self, command, args):
         account = self.account
+        if command == "/strategies":
+            return strategy_catalogue(account.config.strategy.name)
+        if command in {"/techniques", "/plan"}:
+            if not 1 <= len(args) <= 2:
+                return f"Contoh: {command} SOL 15m. /strategies untuk penjelasan teknik."
+            if command == "/plan":
+                return preview(
+                    account,
+                    self.market_charts,
+                    args[0],
+                    args[1] if len(args) == 2 else account.config.demo.interval,
+                )
+            return review(
+                self.market_charts,
+                args[0],
+                args[1] if len(args) == 2 else account.config.demo.interval,
+                account.config.strategy,
+            )
         if command == "/why":
             return why_report(account)
         if command == "/position":

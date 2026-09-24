@@ -223,3 +223,64 @@ order ketika semua pemeriksaan terlihat baik.
 tersimpan. Bukan order proteksi di exchange: bot harus berjalan dan menerima harga
 untuk mengelolanya. Semua menu diagnosis hanya membaca data, tidak reset halt atau
 mengubah posisi, sinyal, dan auto-buy.
+
+## Teknik strategi per coin
+
+**Daftar strategi** (`/strategies`) menjelaskan lima implementasi yang tersedia dan
+nama strategi aktif. **Cek teknik coin** meminta coin lalu timeframe, misalnya SOL
+lalu 15m. Shortcut: `/techniques SOL 15m`. Nama umum dan pair eksplisit mengikuti
+resolver chart. Berlaku untuk pair Binance Spot aktif, termasuk pair USDT.
+
+| Implementasi | Teknik entry |
+| --- | --- |
+| `rule_based_v1` | EMA cross baru, tren SMA, konfirmasi RSI/MACD/Bollinger/volume |
+| `quality_cross_v1` | Baseline plus ADX, rentang ATR, volume relatif, filter candle ekstrem dan jarak harga |
+| `adaptive_trend_v2` | Tren EMA harian, pullback/persilangan pulih, momentum dan kualitas |
+| `regime_reversion_v3` | Rebound terkonfirmasi pada tren/range, RSI dan Bollinger; hindari regime bearish |
+| `curve_scalping_v1` | Kemiringan tren, pullback EMA, recovery melewati high sebelumnya, efisiensi gerak dan kualitas candle |
+
+Perbandingan menjalankan `build_strategy(...).prepare(...)` yang sama dengan engine,
+bukan meniru logika lewat teks. Parameter tiap evaluasi mengikuti config strategi
+akun saat ini, sehingga ini bukan kompetisi preset yang sudah dioptimalkan. Hasil:
+
+- `SETUP ENTRY`: aturan entry terpenuhi pada candle tertutup terakhir.
+- `EXIT CONDITION`: aturan exit terpenuhi; diprioritaskan bila entry juga benar.
+- `WAIT`: indikator siap tetapi entry/exit tidak terpenuhi.
+- `DATA KURANG` / `DATA TIDAK VALID`: belum bisa menilai; bukan sinyal negatif.
+
+Curve scalping juga menampilkan cek trend, pullback, recovery, quality dan score.
+Detail `signal_reason` mengikuti nama alasan di engine. Grafik publik dibatasi 500
+candle; pada timeframe kecil ini biasanya tidak cukup untuk EMA harian. Dua strategi
+yang memerlukan histori harian akan ditandai DATA KURANG. Gunakan data historis
+untuk backtest lengkap, jangan menurunkan warmup demi memaksa sinyal.
+
+Perbandingan ini tidak menambahkan pending order, memilih strategi terbaik otomatis,
+mengubah config aktif, atau melatih model. Teknik yang berkorelasi tidak dihitung
+sebagai voting probabilitas. Exit adalah kondisi keluar posisi long, bukan short.
+Setup tetap memerlukan validasi fresh price, spread, likuiditas, saldo, fee/slippage,
+SL/TP dan risk limits saat eksekusi. Uji out-of-sample dan demo tetap diperlukan.
+
+## Di mana entry, SL, dan TP?
+
+Tekan **Rencana entry demo**, pilih coin dan timeframe. Shortcut `/plan SOL 15m`.
+Hanya pair USDT karena modal akun dihitung dalam USDT. Laporan memuat:
+
+- Strategi akun dan hasil evaluasinya pada candle tertutup terakhir.
+- Hambatan yang terlihat: mode belajar, pause, risk halt, kesehatan collector,
+  posisi terbuka, coin di luar eligible/pilihan, timeframe berbeda, atau belum ada setup.
+- Acuan buy hipotetis = close candle terakhir ditambah slippage config.
+- Quantity, notional dan fee entry dari saldo kas virtual dengan RiskManager yang
+  sama, termasuk lot size, tick, minimum notional, batas alokasi dan stop risk.
+- SL/TP berdasarkan risk config (persen atau ATR), estimasi loss/PnL net fee serta
+  slippage kedua sisi, dan rasio net TP/loss.
+
+Ukuran yang tidak memenuhi minimum/aturan risiko ditolak. Batas partisipasi volume
+juga diperiksa. Harga referensi bukan bid/ask aktual; spread, depth, pajak, umur
+sinyal dan perubahan harga sebelum fill belum dihitung dalam preview. Estimasi loss
+bukan batas kerugian terjamin, karena gap dan fill buruk dapat memperbesarnya.
+
+Preview tetap bisa menunjukkan angka hipotetis saat ada penghalang; bukan persetujuan
+entry. Ia tidak menaruh pending order dan tidak memanggil broker. Engine demo tetap
+memakai quote aktual dan memeriksa seluruh batas sebelum entry. Tidak ada tombol
+paksa BUY atau aktivasi live pada menu ini. Jangan menilai profitabilitas hanya dari
+rasio rencana; statistik out-of-sample dan forward demo masih harus dibuktikan.
