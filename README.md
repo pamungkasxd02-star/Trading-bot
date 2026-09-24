@@ -56,6 +56,14 @@ alasan penolakan coin, beban data, dan biaya/pajak yang belum masuk PnL demo.
 Demo internal **tidak dihitung** sebagai bukti paper Testnet, tidak otomatis melatih ML,
 dan tidak membuka izin live. Seluruh mode Spot long-only, tanpa leverage/futures.
 
+## Perbaikan collector — 24 September 2026
+
+Backfill REST mengambil rentang tambahan ketika cache lengkap, dan mengulang rentang
+yang diperlukan ketika ada gap. Kegagalan API satu pair dicatat tanpa menghentikan
+perbaikan pair lain. `demo-status` kini menyertakan hasil backfill per pair.
+Pemeriksaan 90 tes lokal lulus; ini verifikasi perangkat lunak, bukan peningkatan WR
+atau bukti collector aktif di server.
+
 ## Kontrol dan data demo
 
 Jalankan perintah berikut di terminal kedua dari folder repository:

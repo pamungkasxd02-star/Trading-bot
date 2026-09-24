@@ -247,6 +247,7 @@ class DemoAccount:
             trading_halted=bool(state["halt_reason"]) or self.config.demo.kill_switch_file.exists(),
             quote_age_seconds=quote_age,
             candles=candles,
+            backfill=self.market.metadata("learning_backfill"),
             records=counts,
             trade_count=len(pnl),
             realized_pnl=sum(pnl),
@@ -552,6 +553,55 @@ class DemoEngine:
             )
 
 
+def repair_demo_history(account, client, symbols, *, should_stop=lambda: False):
+    """Incremental REST repair; an API outage on one symbol cannot starve others."""
+    config = account.config
+    end = datetime.now(UTC)
+    spacing = pd.Timedelta(interval_milliseconds(config.demo.interval), unit="ms")
+    warmup_start = pd.Timestamp(end) - spacing * (config.demo.warmup_bars + 2)
+    result = {"observed_at": end.isoformat(), "symbols": {}, "cancelled": False}
+    for symbol in symbols:
+        if should_stop():
+            result["cancelled"] = True
+            break
+        frame = account.market.load_candles(
+            symbol, config.demo.interval, limit=config.demo.warmup_bars
+        )
+        contiguous = (
+            len(frame) >= config.demo.warmup_bars
+            and frame.open_time.diff().dropna().eq(spacing).all()
+        )
+        start = frame.open_time.iloc[-1] if contiguous else warmup_start
+        if not frame.empty:
+            start = min(start, frame.open_time.iloc[-1])
+        watermark = account.market.metadata(f"repair:{symbol}").get("through")
+        if watermark:
+            # WebSocket may have advanced beyond an unobserved gap. REST's last
+            # verified boundary, not the newest WS candle, determines catch-up.
+            start = min(start, pd.Timestamp(watermark).floor(spacing))
+        try:
+            rows = fetch_history(
+                client,
+                account.market,
+                symbol,
+                config.demo.interval,
+                start.to_pydatetime(),
+                end,
+            )
+        except BinanceAPIError as exc:
+            result["symbols"][symbol] = {"status": "failed", "error": str(exc)[:500]}
+            LOGGER.warning("Demo backfill %s unavailable: %s", symbol, exc)
+        else:
+            account.market.set_metadata(f"repair:{symbol}", {"through": end.isoformat()})
+            result["symbols"][symbol] = {
+                "status": "completed",
+                "rows": rows,
+                "from": start.isoformat(),
+            }
+    account.market.set_metadata("learning_backfill", result)
+    return result
+
+
 async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
     if config.strategy.name in {"adaptive_trend_v2", "regime_reversion_v3"}:
         needed = (
@@ -629,27 +679,21 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
         )
         engine = DemoEngine(account, rules)
 
-        def repair():
-            end = datetime.now(UTC)
+        async def repair():
+            result = await asyncio.to_thread(
+                repair_demo_history, account, client, symbols, should_stop=stop.is_set
+            )
+            failed = [s for s, row in result["symbols"].items() if row["status"] == "failed"]
+            account.connection_result("backfill", ", ".join(failed) if failed else None)
             for symbol in symbols:
-                frame = account.market.load_candles(symbol, config.demo.interval, limit=1)
-                start = pd.Timestamp(end) - pd.Timedelta(
-                    interval_milliseconds(config.demo.interval) * (config.demo.warmup_bars + 2),
-                    unit="ms",
-                )
-                if not frame.empty:
-                    start = min(start, frame.open_time.iloc[-1])
-                watermark = account.market.metadata(f"repair:{symbol}").get("through")
-                if watermark:
-                    start = min(start, pd.Timestamp(watermark))
-                fetch_history(
-                    client, account.market, symbol, config.demo.interval, start.to_pydatetime(), end
-                )
-                account.market.set_metadata(f"repair:{symbol}", {"through": end.isoformat()})
+                if stop.is_set():
+                    return
+                engine.latest_signal(symbol)
+                await asyncio.sleep(0)  # Let quotes/heartbeats run between symbols.
 
-        await asyncio.to_thread(repair)
-        for symbol in symbols:
-            engine.latest_signal(symbol)
+        await repair()
+        if stop.is_set():
+            return
         LOGGER.info(
             "DEMO ready: virtual account %s, %s, database %s",
             config.demo.name,
@@ -693,15 +737,7 @@ async def run_demo(config: AppConfig, *, duration_seconds: int | None = None):
                 await pause(config.demo.repair_seconds)
                 if stop.is_set():
                     break
-                try:
-                    await asyncio.to_thread(repair)
-                except BinanceAPIError as exc:
-                    account.connection_result("backfill", str(exc))
-                    LOGGER.warning("Candle backfill unavailable: %s", exc)
-                else:
-                    for symbol in symbols:
-                        engine.latest_signal(symbol)
-                    account.connection_result("backfill")
+                await repair()
 
         tasks.extend(
             asyncio.create_task(guard(c)) for c in (collect(), quote_loop(), repair_loop())

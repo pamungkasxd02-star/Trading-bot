@@ -312,3 +312,85 @@ def test_cli_health_returns_failure_when_collector_is_offline(demo, monkeypatch,
         cli.main(["demo-health"])
     assert exc.value.code == 2
     assert json.loads(capsys.readouterr().out)["health"] == "offline"
+
+
+def seed_repair_candles(account, *, gap=False):
+    end = int(time.time() // 60) * 60000
+    rows = [
+        [end - (501 - i) * 60000, 100, 101, 99, 100, 10, end - (500 - i) * 60000 - 1, 1000, 5]
+        for i in range(500)
+    ]
+    if gap:
+        rows[200][0] -= 30000
+    account.market.upsert_klines("BTCUSDT", "1m", rows)
+    return rows
+
+
+def test_repair_downloads_incrementally_but_refetches_gaps(demo, monkeypatch):
+    from spotlab import learning
+
+    account, _ = demo
+    rows = seed_repair_candles(account)
+    requests = []
+    monkeypatch.setattr(learning, "fetch_history", lambda *args: requests.append(args) or 1)
+    learning.repair_demo_history(account, None, ["BTCUSDT"])
+    assert int(requests[-1][4].timestamp() * 1000) == rows[-1][0]
+    # Introduce an actual missing candle; newest candle alone cannot prove continuity.
+    with account.market._connect() as db:
+        db.execute("DELETE FROM candles WHERE open_time=?", (rows[200][0],))
+    learning.repair_demo_history(account, None, ["BTCUSDT"])
+    assert requests[-1][4].timestamp() * 1000 < rows[200][0]
+
+
+def test_repair_respects_rest_watermark_when_websocket_advanced(demo, monkeypatch):
+    from spotlab import learning
+
+    account, _ = demo
+    rows = seed_repair_candles(account)
+    boundary = pd.Timestamp(rows[0][0] - 60000, unit="ms", tz="UTC")
+    account.market.set_metadata("repair:BTCUSDT", {"through": boundary.isoformat()})
+    requests = []
+    monkeypatch.setattr(learning, "fetch_history", lambda *args: requests.append(args) or 1)
+    learning.repair_demo_history(account, None, ["BTCUSDT"])
+    assert pd.Timestamp(requests[0][4]) == boundary
+
+
+def test_failed_pair_does_not_block_other_pair_or_advance_watermark(demo, monkeypatch):
+    from spotlab import learning
+
+    account, _ = demo
+    old = {"through": "2026-01-01T00:00:00+00:00"}
+    account.market.set_metadata("repair:BTCUSDT", old)
+    seen = []
+
+    def fetch(*args):
+        seen.append(args[2])
+        if args[2] == "BTCUSDT":
+            raise BinanceAPIError("temporarily unavailable")
+        return 3
+
+    monkeypatch.setattr(learning, "fetch_history", fetch)
+    result = learning.repair_demo_history(account, None, ["BTCUSDT", "ETHUSDT"])
+    assert seen == ["BTCUSDT", "ETHUSDT"]
+    assert account.market.metadata("repair:BTCUSDT") == old
+    assert result["symbols"]["ETHUSDT"]["rows"] == 3
+    assert account.status()["backfill"] == result
+
+
+def test_repair_stops_between_pairs_and_propagates_internal_error(demo, monkeypatch):
+    from spotlab import learning
+
+    account, _ = demo
+    calls = []
+    monkeypatch.setattr(learning, "fetch_history", lambda *args: calls.append(args) or 1)
+    result = learning.repair_demo_history(
+        account, None, ["BTCUSDT", "ETHUSDT"], should_stop=lambda: bool(calls)
+    )
+    assert len(calls) == 1 and result["cancelled"]
+
+    def broken(*args):
+        raise RuntimeError("pagination failed")
+
+    monkeypatch.setattr(learning, "fetch_history", broken)
+    with pytest.raises(RuntimeError, match="pagination failed"):
+        learning.repair_demo_history(account, None, ["BTCUSDT"])

@@ -29,6 +29,16 @@ listing/status bisa menuntut restart. Filter historis umur listing belum diberla
 pada demo ini; entry memerlukan 500 candle 1m kontigu. Jangan memakai daftar coin saat
 ini untuk mengklaim backtest bebas survivorship bias pada masa lalu.
 
+Backfill berkala sekarang memakai data tambahan ketika 500 candle cache terakhir
+lengkap dan kontigu. Gap atau cache yang belum cukup memicu pengambilan rentang
+lebih panjang. Batas REST terakhir tetap diperiksa meski WebSocket sudah maju,
+agar gap yang belum diperbaiki tidak terlupakan. Kegagalan API satu pair tidak
+menghentikan pair lain; rincian `backfill.symbols` tersedia pada `demo-status`.
+Status `completed` menunjukkan permintaan REST selesai, bukan jaminan semua candle
+tersedia; pemeriksaan kontiguitas dan kesegaran tetap menentukan sinyal/health.
+Saat stop diminta, tidak ada pair berikutnya yang diproses setelah permintaan
+HTTP yang sedang berlangsung selesai. Timeout HTTP tetap bisa menunda penghentian.
+
 Lebih banyak pair berarti bootstrap, CPU, koneksi dan pertumbuhan data lebih besar.
 Polling quote ditargetkan tiap 5 detik, bukan jaminan latensi eksekusi 5 detik. Bootstrap
 menyiapkan data seluruh pair sebelum loop trading dimulai. WebSocket dibagi beberapa
