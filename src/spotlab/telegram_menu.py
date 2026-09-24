@@ -12,6 +12,8 @@ MAIN_ROWS = [
     ["Kenapa belum buy?", "Posisi aktif"],
     ["Daftar strategi", "Cek teknik coin"],
     ["Rencana entry demo"],
+    ["Semua pair USDT", "Semua pair Spot"],
+    ["Cakupan pasar", "Detail coin"],
 ]
 DEMO_ROWS = [
     ["Coin eligible", "Pilih coin demo"],
@@ -21,6 +23,9 @@ DEMO_ROWS = [
 ]
 BUTTONS = {
     "Status akun": "/status",
+    "Semua pair USDT": "/markets USDT",
+    "Semua pair Spot": "/markets ALL",
+    "Cakupan pasar": "/coverage",
     "Daftar strategi": "/strategies",
     "Kenapa belum buy?": "/why",
     "Posisi aktif": "/position",
@@ -37,6 +42,10 @@ BUTTONS = {
     "Batal": "/menu",
 }
 PROMPTS = {
+    "Detail coin": (
+        "/coin",
+        "Ketik ticker seperti SOL untuk melihat semua pasangan dan alasan filter.",
+    ),
     "Rencana entry demo": (
         "/plan",
         "Pilih coin/timeframe untuk simulasi sizing, SL dan TP. Tidak membuat order.",
@@ -104,6 +113,11 @@ def route(text, control, now):
     text = text.strip()
     if not text:
         return "", "Kirim teks atau pilih tombol.", keyboard(MAIN_ROWS)
+    if text in {"Halaman berikut", "Halaman sebelumnya"}:
+        control.pop("menu_prompt", None)
+        saved = control.get("market_browser", {"quote": "USDT", "page": 1})
+        page = max(1, saved["page"] + (1 if text == "Halaman berikut" else -1))
+        return f"/markets {saved['quote']} {page}", None, None
     if text in PROMPTS:
         command, prompt = PROMPTS[text]
         control["menu_prompt"] = dict(command=command, expires=now + 300)
@@ -156,3 +170,10 @@ def route(text, control, now):
         control.pop("menu_prompt", None)
         return command + " " + text, None, keyboard(MAIN_ROWS)
     return "/menu", None, None
+
+
+BROWSER_ROWS = [
+    ["Halaman sebelumnya", "Halaman berikut"],
+    ["Detail coin", "Lihat candle"],
+    ["Menu utama"],
+]

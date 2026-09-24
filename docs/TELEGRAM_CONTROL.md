@@ -284,3 +284,37 @@ entry. Ia tidak menaruh pending order dan tidak memanggil broker. Engine demo te
 memakai quote aktual dan memeriksa seluruh batas sebelum entry. Tidak ada tombol
 paksa BUY atau aktivasi live pada menu ini. Jangan menilai profitabilitas hanya dari
 rasio rencana; statistik out-of-sample dan forward demo masih harus dibuktikan.
+
+## Jelajahi semua coin/token Binance Spot
+
+Menu **Semua pair USDT** (`/markets USDT`) menampilkan seluruh pair aktif dengan
+quote USDT, 30 pair per halaman. **Semua pair Spot** (`/markets ALL`) juga mencakup
+quote lain; `/markets BTC 1` memfilter quote BTC secara persis, bukan substring.
+Gunakan **Halaman berikut** / **Halaman sebelumnya**; posisi halaman tersimpan per
+akun. Halaman yang melebihi batas dikembalikan ke halaman terakhir. Daftar disortir
+berdasarkan symbol; posisi halaman dapat bergeser setelah katalog diperbarui.
+
+**Detail coin** (`/coin SOL`) menampilkan pasangan aktif, keikutsertaan dalam
+collector, dan alasan filter scanner jika tersimpan. Bisa juga memakai pair lengkap
+seperti `/coin ETHBTC`. Alasan merujuk snapshot startup, bukan klaim kondisi pasar
+saat ini. Coin tanpa alasan tersimpan disebut belum masuk snapshot; tidak ditebak
+sebagai coin berbahaya. `collector=ya` hanya berarti masuk daftar sumber akun,
+bukan bukti runtime sehat; lihat Status akun untuk heartbeat/kesehatan data.
+
+**Cakupan pasar** (`/coverage`) menampilkan jumlah base asset unik, pair per quote,
+dan jumlah pair dalam collector akun. Katalog dimuat lewat API publik dan diperbarui
+pada permintaan setelah cache berumur 15 menit, sehingga listing aktif baru bisa
+muncul tanpa mengganti daftar ticker dalam kode. Ini tidak menambahkan subscription
+atau order otomatis; collector masih menggunakan snapshot startup.
+
+Semua pair dalam katalog dapat diminta chart, analisis dan perbandingan teknik;
+histori terlalu pendek/invalid tetap ditolak. Bot tidak dibatasi tombol contoh
+BTC/ETH/SOL: ketik ticker atau pair lain. Nama lengkap token tidak selalu tersedia;
+gunakan ticker jika alias tidak dikenali. Detail coin membatasi tampilan 30 pair;
+`/coins TICKER` menyediakan pencarian berhalaman.
+
+Preset `config/all-scalping-demo.yaml` sudah memakai `universe.mode: all` dan
+`max_symbols: null`, tetapi entry demo tetap hanya pair USDT yang lolos volume,
+spread, status Spot, dukungan order dan pengecualian config. Melihat seluruh pair
+bukan berarti merekam semua pair sekaligus atau membeli semuanya. Token DEX,
+contract address, futures, delisted dan aset di luar Binance Spot belum didukung.

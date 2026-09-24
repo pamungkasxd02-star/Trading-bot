@@ -10,11 +10,12 @@ from datetime import UTC, datetime
 from spotlab.candle_alerts import candle_png
 from spotlab.candle_analysis import analysis_report
 from spotlab.entry_preview import preview
+from spotlab.market_browser import browse, coin_info, coverage
 from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selected_symbol
 from spotlab.strategy_review import catalogue as strategy_catalogue
 from spotlab.strategy_review import review
 from spotlab.telegram_diagnostics import position_report, why_report
-from spotlab.telegram_menu import DEMO_ROWS, GUIDE, MAIN_ROWS, keyboard, route
+from spotlab.telegram_menu import BROWSER_ROWS, DEMO_ROWS, GUIDE, MAIN_ROWS, keyboard, route
 
 HELP = (
     "/status /health /coins [query] [page] /eligible [page] /signals [COIN] /settings\n"
@@ -166,6 +167,9 @@ class TelegramControl:
                 "/strategies",
                 "/techniques",
                 "/plan",
+                "/markets",
+                "/coverage",
+                "/coin",
             }:
                 reply = (command, args)
             else:
@@ -175,6 +179,8 @@ class TelegramControl:
             command, args = reply
             try:
                 reply = self.read_command(command, args)
+                if command == "/markets":
+                    markup = keyboard(BROWSER_ROWS)
             except ValueError as exc:
                 reply = str(exc)
             except Exception:
@@ -189,6 +195,25 @@ class TelegramControl:
 
     def read_command(self, command, args):
         account = self.account
+        if command == "/markets":
+            if len(args) > 2 or (len(args) == 2 and not args[1].isdigit()):
+                return "Contoh: /markets USDT 1, /markets BTC 1 atau /markets ALL 1."
+            result, page, quote = browse(
+                self.market_charts.catalogue(),
+                args[0] if args else "USDT",
+                int(args[1]) if len(args) == 2 else 1,
+            )
+            with account.edit() as (_, state):
+                state.setdefault("telegram_control", {})["market_browser"] = dict(
+                    page=page, quote=quote
+                )
+            return result
+        if command == "/coverage":
+            return coverage(self.market_charts.catalogue(), account)
+        if command == "/coin":
+            if len(args) != 1:
+                return "Contoh: /coin SOL atau /coin ETHBTC."
+            return coin_info(self.market_charts.catalogue(), account, args[0])
         if command == "/strategies":
             return strategy_catalogue(account.config.strategy.name)
         if command in {"/techniques", "/plan"}:

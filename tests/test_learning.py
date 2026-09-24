@@ -718,3 +718,24 @@ def test_photo_wizard_restores_main_keyboard(demo, monkeypatch):
     assert calls == [("/chart", ["BTC", "15m"])]
     assert "Selesai" in sender.sent[-1]
     assert "Lihat candle" in str(sender.markup)
+
+
+def test_market_navigation_private_chat_and_scoped_state(demo):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.market_charts.catalogue = lambda: {
+        f"T{i}USDT": {"symbol": f"T{i}USDT", "baseAsset": f"T{i}", "quoteAsset": "USDT"}
+        for i in range(45)
+    }
+    bot.process(command_update("/auto off"))
+    bot.process(command_update("Semua pair USDT", uid=2))
+    assert "halaman 1/2" in sender.sent[-1]
+    assert "Halaman berikut" in str(sender.markup)
+    bot.process(command_update("Halaman berikut", uid=3))
+    assert "halaman 2/2" in sender.sent[-1]
+    bot.process(command_update("Halaman sebelumnya", uid=4, owner=98765))
+    assert account.status()["telegram_control"]["market_browser"]["page"] == 2
+    assert account.status()["telegram_control"]["auto"] is False

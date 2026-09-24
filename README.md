@@ -32,6 +32,12 @@ Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo
 
 ## Kontrol lewat Telegram
 
+**Semua pair USDT** dan **Semua pair Spot** membuka katalog berhalaman, bukan daftar
+coin tetap. **Detail coin** (`/coin SOL`) menunjukkan pasangan serta alasan filter
+scanner. **Cakupan pasar** (`/coverage`) membedakan pair yang tersedia untuk chart
+dengan pair yang masuk collector. Katalog diperbarui saat diminta setelah 15 menit;
+collector tetap memakai snapshot startup. Token di luar Binance Spot belum didukung.
+
 **Daftar strategi** menjelaskan lima teknik yang tersedia. **Cek teknik coin**
 (atau `/techniques SOL 15m`) membandingkan hasil kode strategi pada candle coin
 pilihan: setup, wait, exit, atau data kurang. Ini tidak mengubah strategi aktif
