@@ -46,6 +46,8 @@ atau update yang sudah diproses diabaikan. Pada awal polling, backlog lama dilew
 | `/chart bitcoin 15m` | Grafik terbaru coin dan interval pilihan dari API publik |
 | `/chart ETH/BTC 4h` | Pair eksplisit, dengan sumbu harga dalam BTC |
 | `/intervals` | Interval candle yang didukung |
+| `/analyze bitcoin` | Analisis default 1m, 5m, 15m |
+| `/analyze SOL 5m 15m 1h 4h` | Bandingkan maksimal empat timeframe |
 | `/mode observe` | Gambar pengamatan, tidak harus menunggu setup |
 | `/mode setups` | Gambar hanya ketika setup entry terdeteksi |
 | `/alerts off` atau `/alerts on` | Matikan/hidupkan gambar otomatis |
@@ -116,3 +118,34 @@ on-demand ke dataset strategi. Coin baru dengan kurang dari dua candle ditolak.
 Interval grafik tidak mengubah timeframe strategi, watchlist, atau izin auto-buy.
 `/watch BTC ethereum` dan `/tradecoins BTC` menerima alias tetapi tetap hanya eligible.
 Grafik manual juga bisa melihat pair yang tidak lolos filter trading.
+
+## Analisis beberapa timeframe
+
+`/analyze BTC 1m 5m 15m` mengambil candle tertutup terbaru untuk setiap interval.
+Laporan berisi susunan harga/EMA dan arah EMA lambat, RSI, MACD histogram dan
+perubahannya, ATR sebagai persen harga, serta volume relatif terhadap rata-rata
+candle sebelumnya. Body/wick ditampilkan sebagai persen rentang high-low candle.
+Harga juga dibandingkan dengan high/low `strategy.bb_period` candle sebelumnya;
+rentang tersebut hanya deskripsi historis, bukan level support/resistance terjamin.
+
+Periode indikator mengikuti `strategy` pada config akun. Volume referensi dan range
+tidak memasukkan candle yang sedang dinilai. RSI pada jendela benar-benar datar
+ditampilkan 50; volume pembanding nol ditampilkan N/A. Histori pendek, stale atau
+berlubang tidak menghasilkan konfirmasi. Kegagalan satu timeframe ditandai DATA TIDAK
+LENGKAP; timeframe lain tetap bisa ditampilkan. Error transport tidak dibocorkan.
+
+Default bisa diatur dalam blok `candle_alerts` yang sudah ada:
+
+```yaml
+analysis_intervals: [1m, 5m, 15m]
+```
+
+Maksimal empat interval unik per request; interval duplikat hanya diambil sekali.
+Permintaan dilakukan berurutan untuk membatasi beban API, jadi timestamp terakhir
+tiap timeframe bisa berbeda; laporan bukan snapshot simultan atau sinyal backtest.
+Analisis berjalan dalam worker kontrol Telegram, terpisah dari collector demo.
+Permintaan jaringan lambat dapat menunda balasan command berikutnya.
+
+Keselarasan tren adalah ringkasan aturan, bukan skor probabilitas, rekomendasi buy,
+atau bukti peningkatan win rate. Perintah ini tidak mengubah auto-buy, pending order,
+strategi, watchlist atau gate live. Tetap uji strategi lewat backtest dan paper trading.

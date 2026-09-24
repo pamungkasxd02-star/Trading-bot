@@ -191,6 +191,27 @@ class DemoConfig(StrictModel):
 
 
 class CandleAlertsConfig(StrictModel):
+    analysis_intervals: list[
+        Literal[
+            "1s",
+            "1m",
+            "3m",
+            "5m",
+            "15m",
+            "30m",
+            "1h",
+            "2h",
+            "4h",
+            "6h",
+            "8h",
+            "12h",
+            "1d",
+            "3d",
+            "1w",
+            "1M",
+        ]
+    ] = Field(default_factory=lambda: ["1m", "5m", "15m"], min_length=1, max_length=4)
+
     commands_enabled: bool = False
     enabled: bool = False
     setups_only: bool = True

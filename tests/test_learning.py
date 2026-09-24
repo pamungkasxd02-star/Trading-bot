@@ -588,3 +588,25 @@ def test_manual_chart_and_catalogue_independent_of_trade_universe(demo, monkeypa
     assert account.status()["telegram_control"]["watch"] == ["BTCUSDT"]
     bot.process(command_update("/tradecoins ETHBTC", uid=3))
     assert not account.status()["telegram_control"].get("tradecoins")
+
+
+def test_telegram_analyze_routes_config_defaults_without_enabling_orders(demo, monkeypatch):
+    from spotlab.telegram_control import TelegramControl
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    calls = []
+
+    def report(charts, query, intervals, config):
+        calls.append((query, intervals))
+        return "analisis selesai"
+
+    monkeypatch.setattr("spotlab.telegram_control.analysis_report", report)
+    bot.process(command_update("/auto off"))
+    bot.process(command_update("/analyze bitcoin", uid=2))
+    bot.process(command_update("/analyze ETH 15m 1h", uid=3))
+    assert calls == [("bitcoin", ["1m", "5m", "15m"]), ("ETH", ["15m", "1h"])]
+    assert sender.sent[-1] == "analisis selesai"
+    assert account.status()["telegram_control"]["auto"] is False
+    assert account.status()["position"] is None

@@ -8,13 +8,15 @@ import time
 from datetime import UTC, datetime
 
 from spotlab.candle_alerts import candle_png
+from spotlab.candle_analysis import analysis_report
 from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selected_symbol
 
 HELP = (
     "/status /health /coins [query] [page] /eligible [page] /signals [COIN] /settings\n"
     "/watch ALL or BTCUSDT ETHUSDT (pictures only)\n"
     "/tradecoins ALL or BTCUSDT ETHUSDT (demo entries)\n"
-    "/chart BTC 15m | /intervals\n/auto on | off\n/alerts on | off\n/mode setups | observe\n"
+    "/chart BTC 15m | /intervals | /analyze BTC 1m 5m 15m\n"
+    "/auto on | off\n/alerts on | off\n/mode setups | observe\n"
     "Demo only; filters/SL/TP/risk limits always apply."
 )
 
@@ -143,6 +145,7 @@ class TelegramControl:
                 "/settings",
                 "/eligible",
                 "/intervals",
+                "/analyze",
             }:
                 reply = (command, args)
             else:
@@ -184,6 +187,15 @@ class TelegramControl:
                 f"{control.get('setups_only', account.config.candle_alerts.setups_only)}\n"
                 f"Global interval: {account.config.candle_alerts.min_interval_seconds}s | "
                 f"coin cooldown: {account.config.candle_alerts.symbol_cooldown_seconds}s"
+            )
+        if command == "/analyze":
+            if not args:
+                return "Contoh: /analyze bitcoin 1m 5m 15m (maksimal 4 interval)."
+            return analysis_report(
+                self.market_charts,
+                args[0],
+                args[1:] or account.config.candle_alerts.analysis_intervals,
+                account.config.strategy,
             )
         if command == "/intervals":
             return "Interval chart: " + " ".join(INTERVALS) + "\n1m=menit; 1M=bulan."

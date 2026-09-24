@@ -37,6 +37,10 @@ dengan `/watch BTC ETH`, minta `/chart bitcoin 15m` atau `/chart ETH/BTC 4h`,
 lihat timeframe lewat `/intervals`, dan atur entry demo dengan `/tradecoins` serta `/auto on|off`. Perintah hanya diterima
 dari chat pribadi pemilik yang dikonfigurasi. Akun belajar tetap tanpa order; filter
 kualitas, SL/TP dan risk halt tetap berlaku. [Panduan kontrol Telegram](docs/TELEGRAM_CONTROL.md).
+Tambahan: `/analyze bitcoin 1m 5m 15m` membandingkan tren EMA, RSI, MACD, ATR,
+volume, body/wick dan range harga antar-timeframe. Data tidak lengkap ditandai;
+analisis tidak mengaktifkan buy atau mengubah strategi. Default interval bisa diatur
+di `candle_alerts.analysis_intervals`.
 Tidak ada jaminan coin bebas manipulasi atau harga terus naik.
 
 ## Candle ke Telegram
