@@ -15,3 +15,26 @@ tests
 dist
 build
 *.egg-info
+
+# Runtime copies, exports and credentials, even outside data/.
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.zip
+*.tar
+*.gz
+backups/
+backup/
+exports/
+logs/
+.ssh/

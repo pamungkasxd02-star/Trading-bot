@@ -5,6 +5,12 @@ Repository memakai `.devcontainer/devcontainer.json`. Saat Codespace baru dibuat
 menyalin template `.env` jika belum ada, lalu menjalankan replay historis enam bulan.
 Tidak ada API key yang diperlukan untuk demo ini.
 
+## Privasi
+
+Baca [CODESPACES_PRIVACY.md](CODESPACES_PRIVACY.md) sebelum menyimpan key atau backup.
+Setup baru memasang hook privasi bila belum ada hook custom. Instance lama memerlukan
+penerapan manual. Port otomatis dinonaktifkan; port manual tetap perlu dicek Private.
+
 ## Mulai
 
 1. Buka repository di GitHub, pilih **Code → Codespaces → Create codespace on main**.

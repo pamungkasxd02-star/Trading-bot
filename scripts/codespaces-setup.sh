@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ required"'
@@ -9,6 +10,10 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
   chmod 600 .env
 fi
+if [[ -z "$(git config --get core.hooksPath || true)" ]]; then
+  git config --local core.hooksPath .githooks
+fi
+python3 scripts/privacy-check.py
 bash scripts/codespaces-demo.sh
 echo "Setup selesai. Ulangi demo: bash scripts/codespaces-demo.sh"
 echo "Riset lengkap: .venv/bin/python scripts/research_regime.py --output reports/regime"

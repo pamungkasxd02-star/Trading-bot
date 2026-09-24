@@ -8,6 +8,18 @@ Fokus proyek: menguji strategi secara jujur sebelum mempertimbangkan uang sunggu
 Strategi belum membuktikan hasil stabil, paper Testnet 14 hari belum selesai, dan live
 masih dikunci. Kode yang berhasil dites bukan bukti profit atau bukti bot berjalan 24/7.
 
+## Privasi data Codespaces
+
+**Repo ini publik; jangan push data akun atau secret.** Proteksi Git/Docker diperluas
+untuk varian `.env`, database, log dan backup. Tersedia pemeriksaan Git index sebelum
+commit dan di CI; port forwarding otomatis dinonaktifkan pada devcontainer.
+Script demo memakai izin file baru yang lebih ketat pada Linux.
+
+Lihat [panduan privasi Codespaces](docs/CODESPACES_PRIVACY.md) untuk memasang hook pada
+Codespace lama, memastikan port **Private**, dan menyimpan backup dengan aman.
+Perubahan kode tidak membuktikan pengaturan instance lama sudah diterapkan atau
+bahwa tidak pernah terjadi kebocoran. Laporan riset historis di repo tetap publik.
+
 ## Mulai dari demo tanpa API key
 
 Di [GitHub Codespaces](docs/CODESPACES.md), tunggu setup selesai lalu jalankan:

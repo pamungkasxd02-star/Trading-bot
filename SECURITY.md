@@ -30,3 +30,9 @@ menanggung risiko aksesnya.
 
 Jangan membuka issue publik yang berisi secret atau detail akun. Revokasi credential lebih
 dulu, lalu kirim laporan privat melalui fitur security advisory GitHub repository.
+
+## Privasi Codespaces dan pencegahan commit
+
+Ikuti [panduan privasi](docs/CODESPACES_PRIVACY.md). Jalankan
+`python3 scripts/privacy-check.py` untuk memeriksa Git index tanpa menampilkan secret.
+Pemeriksaan ini terbatas; histori commit dan pengaturan port perlu diaudit terpisah.

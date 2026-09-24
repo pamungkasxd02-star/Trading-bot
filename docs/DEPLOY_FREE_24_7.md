@@ -63,8 +63,8 @@ nano .env
 Isi minimal:
 
 ```dotenv
-BINANCE_API_KEY=isi_key_testnet
-BINANCE_API_SECRET=isi_secret_testnet
+BINANCE_API_KEY= # isi key Testnet hanya di .env lokal
+BINANCE_API_SECRET= # isi secret Testnet hanya di .env lokal
 SPOTLAB_CONFIG=config/paper-server.yaml
 SPOTLAB_HISTORY_MONTHS=24
 ```
