@@ -25,6 +25,7 @@ from spotlab.telegram_menu import (
     metric,
     route,
 )
+from spotlab.telegram_text import block, number, utc_time
 
 
 class TelegramControl:
@@ -61,9 +62,10 @@ class TelegramControl:
             control["order_cursor"] = row["id"]
             order = json.loads(row["payload"])
         self.notifier.send(
-            f"DEMO {order['side']} {row['symbol']}\n"
-            f"Quantity={order['quantity']} | price={order.get('price', order.get('entry_price'))}\n"
-            "Order virtual, tidak dikirim ke exchange. Lihat /status untuk hasil akun."
+            f"DEMO {order['side']} {row['symbol']}\n\n"
+            f"Jumlah: {number(order['quantity'])}\n"
+            f"Harga: {number(order.get('price', order.get('entry_price')))} USDT\n"
+            "\nTransaksi virtual. /position untuk posisi, /status untuk hasil akun."
         )
 
     def process(self, update):
@@ -256,24 +258,24 @@ class TelegramControl:
             enabled = status.get("telegram_control", {}).get("auto", True)
             active = not study and enabled and not status["trading_halted"]
             mode = "BELAJAR CANDLE (tanpa order)" if study else "DEMO (saldo virtual)"
-            intro = (
-                f"Selamat datang! Mode: {mode}\n"
-                f"Kondisi: {health_label(status['health'])} | "
-                f"Auto entry diizinkan: {'YA' if active else 'TIDAK'}\n"
-                "Live tidak diaktifkan oleh menu ini.\n\n"
+            intro = block(
+                "Akun demo" if command == "/demo" else "Trading bot",
+                f"Mode: {mode}",
+                f"Kondisi: {health_label(status['health'])}",
+                f"Entry baru: {'diizinkan' if active else 'tidak aktif'}",
             )
             if command == "/demo":
                 return intro + (
-                    "Pilih coin demo membatasi entry baru. Aktifkan auto-buy demo menunggu "
-                    "sinyal yang lolos filter dan batas risiko. Jeda menghentikan entry baru; "
-                    "posisi lama tetap dikelola. Akun belajar menolak aktivasi order."
+                    "\n\nPilih coin untuk membatasi entry baru. "
+                    "Aktifkan auto-buy untuk menunggu sinyal.\n"
+                    "Jeda tidak menutup posisi. Mode belajar tidak membuka order."
                 )
             return intro + (
-                "Mulai dari Lihat candle, lalu ketik BTC 15m.\n"
-                "Analisis coin membandingkan tren beberapa timeframe.\n"
-                "Pasar dan coin untuk katalog; Strategi dan analisis untuk penilaian.\n"
-                "Akun demo mengatur entry virtual. Notifikasi hanya mengatur pesan.\n"
-                "Panduan dan bantuan menjelaskan cara pakai; /menu mengembalikan menu utama."
+                "\n\nLihat candle → pilih coin → pilih interval.\n"
+                "Pasar dan coin: cari pair.\n"
+                "Strategi dan analisis: baca sinyal dan rencana entry.\n"
+                "Akun demo: posisi dan auto-buy.\nNotifikasi: pesan gambar.\n\n"
+                "Butuh panduan? Pilih Panduan dan bantuan."
             )
         if command in {"/status", "/health"}:
             s = account.status()
@@ -281,17 +283,23 @@ class TelegramControl:
                 "auto", True
             )
             mode = "BELAJAR (tanpa order)" if account.config.demo.analysis_only else "DEMO VIRTUAL"
-            return (
-                f"{mode} | Kondisi: {health_label(s['health'])}\n"
-                f"Auto entry: {'ON' if auto else 'OFF'} | "
-                f"Risk halt: {'YA' if s['trading_halted'] else 'TIDAK'}\n"
-                f"Equity virtual: {s['equity']:.4f} USDT | Trade selesai: {s['trade_count']}\n"
-                f"WR: {metric(s['win_rate_pct'], '%')} | PF: {metric(s['profit_factor'])}\n"
-                f"Expectancy: {metric(s['expectancy'])} USDT/trade\n"
-                f"Posisi: {s['position']['symbol'] if s['position'] else 'belum ada'}\n"
-                "ON bukan jaminan entry: data, sinyal dan risk tetap diperiksa.\n"
-                "N/A = belum dapat dihitung. Pilih Kenapa belum buy? di Akun demo.\n"
-                "Akun virtual ini tidak dihitung sebagai paper Testnet; live punya gate terpisah."
+            return block(
+                "Status akun",
+                f"Mode: {mode}",
+                f"Kondisi: {health_label(s['health'])}",
+                f"Auto entry: {'ON' if auto else 'OFF'}",
+                f"Risk halt: {'aktif' if s['trading_halted'] else 'tidak aktif'}",
+                "",
+                f"Equity virtual: {s['equity']:,.2f} USDT",
+                f"Posisi: {s['position']['symbol'] if s['position'] else 'belum ada'}",
+                f"Trade selesai: {s['trade_count']}",
+                "",
+                f"Win rate: {metric(s['win_rate_pct'], '%')}",
+                f"Profit factor: {metric(s['profit_factor'])}",
+                f"Rata-rata PnL: {metric(s['expectancy'])} USDT/trade",
+                "",
+                "N/A: belum dapat dihitung. Auto ON tetap menunggu sinyal dan lolos risiko.",
+                "Akun virtual internal; bukan saldo Binance Testnet/live.",
             )
         if command == "/settings":
             control = account.status().get("telegram_control", {})
@@ -301,14 +309,14 @@ class TelegramControl:
             mode = control.get("setups_only", cfg.setups_only)
             alerts = cfg.enabled and control.get("alerts", True)
             return (
-                "PENGATURAN AKUN INI\n"
+                "Pengaturan akun\n\n"
                 f"Coin gambar: {', '.join(watch) if watch else 'semua eligible'}\n"
                 f"Coin entry demo: {', '.join(trade) if trade else 'semua eligible'}\n"
                 f"Gambar otomatis: {'ON' if alerts else 'OFF'}\n"
-                f"Mode gambar: {'hanya setup' if mode else 'semua pengamatan'}\n"
+                f"\nMode gambar: {'hanya setup' if mode else 'semua pengamatan'}\n"
                 f"Jeda minimal semua gambar: {cfg.min_interval_seconds} detik\n"
                 f"Jeda per coin: {cfg.symbol_cooldown_seconds} detik\n"
-                "Notifikasi tidak mengubah coin trading. Lihat Status akun untuk auto entry."
+                "\nPengaturan gambar tidak mengubah auto-buy."
             )
         if command == "/analyze":
             if not args:
@@ -376,7 +384,7 @@ class TelegramControl:
         )
         self.notifier.send_photo(
             png,
-            f"{market['symbol']} | {interval} | closed {frame.close_time.iloc[-1].isoformat()}\n"
+            f"{market['symbol']} | {interval} | closed {utc_time(frame.close_time.iloc[-1])}\n"
             "Grafik publik saja; tidak menambahkan coin ke trading/watchlist.",
         )
         return None

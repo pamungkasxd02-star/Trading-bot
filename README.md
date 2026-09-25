@@ -48,6 +48,8 @@ melatih ML, mengganti strategi, atau membuka gate live.
 
 ## Kontrol lewat Telegram
 
+[Contoh tampilan dan arti pesan](docs/TELEGRAM_MESSAGES.md).
+
 Mulai dengan `/start`: menu sekarang dibagi menjadi **Pasar dan coin**, **Strategi
 dan analisis**, **Akun demo**, **Notifikasi**, serta **Panduan dan bantuan**.
 [Panduan pemula dan peta tombol](docs/TELEGRAM_QUICKSTART.md) menjelaskan langkah

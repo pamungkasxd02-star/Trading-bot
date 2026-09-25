@@ -6,6 +6,7 @@ import numpy as np
 
 from spotlab.indicators import atr, ema, macd, rsi
 from spotlab.market_charts import INTERVALS
+from spotlab.telegram_text import utc_time
 
 
 def describe(frame, config):
@@ -74,7 +75,7 @@ def describe(frame, config):
         high=high,
         location=location,
         close=float(last.close),
-        closed_at=last.close_time.isoformat(),
+        closed_at=utc_time(last.close_time),
         **anatomy,
     )
 
@@ -84,7 +85,7 @@ def analysis_report(charts, query, intervals, config):
     if not 1 <= len(intervals) <= 4 or any(i not in INTERVALS for i in intervals):
         raise ValueError("Pilih 1-4 interval valid. Contoh: /analyze BTC 1m 5m 15m")
     market = charts.resolve(query)
-    lines = [f"ANALISIS CANDLE {market['symbol']} | harga dalam {market['quoteAsset']}"]
+    lines = [f"Analisis {market['symbol']} | harga dalam {market['quoteAsset']}"]
     results = []
     for interval in intervals:
         try:

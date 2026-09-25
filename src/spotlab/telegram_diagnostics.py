@@ -2,6 +2,8 @@
 
 import json
 
+from spotlab.telegram_text import number, utc_time
+
 SKIP_REASONS = {
     "spread_too_wide": "spread terlalu lebar",
     "signal_price_drift": "harga sudah terlalu jauh dari sinyal",
@@ -16,18 +18,20 @@ def position_report(account):
     if not p:
         return "Belum ada posisi demo terbuka. Lihat Kenapa belum buy? untuk pemeriksaan akun."
     return (
-        f"POSISI DEMO {p['symbol']}\n"
-        f"Entry: {p['entry_price']:.8g} | size: {p['quantity']:.8g}\n"
-        f"Stop-loss: {p['stop_price']:.8g} | take-profit: {p['take_profit_price']:.8g}\n"
-        f"Waktu entry: {p['entry_time']}\nHealth: {status['health']}\n"
-        "SL/TP virtual hanya dikelola saat proses berjalan dengan data harga tersedia."
+        f"Posisi demo · {p['symbol']}\n\n"
+        f"Entry: {number(p['entry_price'])} USDT\n"
+        f"Jumlah: {number(p['quantity'])}\n\n"
+        f"Stop-loss: {number(p['stop_price'])}\n"
+        f"take-profit: {number(p['take_profit_price'])}\n"
+        f"\nDibuka: {utc_time(p['entry_time'])}\n"
+        "\nSL/TP virtual memerlukan bot aktif dan data harga tersedia."
     )
 
 
 def why_report(account):
     status = account.status()
     control = status.get("telegram_control", {})
-    lines = ["PEMERIKSAAN ENTRY DEMO"]
+    lines = ["Kenapa belum buy?", ""]
     if account.config.demo.analysis_only:
         lines.append("- Mode belajar: memang tidak membuka posisi.")
     if not control.get("auto", True):
@@ -41,7 +45,7 @@ def why_report(account):
     if status["position"]:
         lines.append(f"- Posisi {status['position']['symbol']} masih terbuka; batas satu posisi.")
     selected = control.get("tradecoins", [])
-    lines.append("Coin entry: " + (", ".join(selected[:20]) if selected else "ALL eligible"))
+    lines.append("Coin entry: " + (", ".join(selected[:20]) if selected else "semua eligible"))
     rows = account.signals(2000)
     scoped = [r for r in rows if not selected or r["symbol"] in selected]
     fresh = [r for r in scoped if r["fresh_now"]]
@@ -71,10 +75,8 @@ def why_report(account):
         if payload.get("event") == "entry_skipped":
             reason = SKIP_REASONS.get(payload.get("reason"), "validasi eksekusi/risk menolak entry")
             lines.append(
-                f"Riwayat skip terakhir (bisa sudah lama): {event['timestamp']} | {reason}"
+                f"Riwayat skip terakhir (bisa sudah lama): {utc_time(event['timestamp'])}\n{reason}"
             )
             break
-    lines.append(
-        "Ringkasan diagnosis, bukan jaminan buy berikutnya. Live tetap terkunci oleh gate terpisah."
-    )
+    lines.append("\nRingkasan kondisi akun; tidak mengirim order.")
     return "\n".join(lines)

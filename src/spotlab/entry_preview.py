@@ -4,6 +4,7 @@ from spotlab.data import parse_symbol_rules
 from spotlab.indicators import atr
 from spotlab.risk import RiskManager, RiskViolation
 from spotlab.strategy_review import evaluate
+from spotlab.telegram_text import number, utc_time
 
 
 def preview(account, charts, query, interval):
@@ -38,8 +39,8 @@ def preview(account, charts, query, interval):
     last = frame.iloc[-1]
     entry = float(last.close) * (1 + slip)
     lines = [
-        f"RENCANA HIPOTETIS {symbol} | {interval}",
-        f"Candle tutup UTC: {last.close_time.isoformat()}",
+        f"Rencana entry · {symbol} | {interval}\n",
+        f"Candle tutup UTC: {utc_time(last.close_time)}",
         f"Strategi: {cfg.strategy.name} | {evaluation['state']}",
         evaluation["detail"],
         "Hambatan: "
@@ -67,10 +68,11 @@ def preview(account, charts, query, interval):
         lines.append("Sizing melebihi batas partisipasi volume; engine harus menolak.")
     lines.extend(
         [
-            f"Acuan buy simulasi: {entry:.8g} USDT | quantity: {qty:.8g}",
-            f"Notional: {float(sized.notional):.4f} USDT | fee entry: {qty * entry * fee:.4f}",
-            f"SL trigger: {stop:.8g} | TP trigger: {target:.8g}",
-            f"Estimasi loss ke SL: {net_loss:.4f} USDT | PnL ke TP: {net_gain:.4f} USDT",
+            f"\nAcuan buy: {number(entry)} USDT\nJumlah: {number(qty)}",
+            f"Nilai order: {float(sized.notional):.4f} USDT\n"
+            f"Fee entry: {qty * entry * fee:.4f} USDT",
+            f"\nSL trigger: {number(stop)}\nTP trigger: {number(target)}",
+            f"\nEstimasi loss ke SL: {net_loss:.4f} USDT\nPnL ke TP: {net_gain:.4f} USDT",
             f"Rasio net TP/loss: {ratio:.2f} | fee/slippage per sisi: "
             f"{cfg.backtest.fee_bps}/{cfg.backtest.slippage_bps} bps",
             "Asumsi fill di trigger dengan slippage tetap; gap dapat memperbesar loss. "
