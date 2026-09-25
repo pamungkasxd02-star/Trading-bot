@@ -30,6 +30,15 @@ order virtual dan tidak otomatis melatih AI.
 Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo-signals`.
 [Panduan belajar candle](docs/CANDLE_STUDY.md) menjelaskan tiap indikator dan batasannya.
 
+## Dataset resmi dan pengujian strategi
+
+Untuk memasukkan histori Binance ke dataset riset terpisah, gunakan
+[panduan data dan riset](docs/DATA_RESEARCH.md). Importer memeriksa kelengkapan tiap
+coin, melanjutkan prefix cache yang valid, dan tidak mencampur snapshot lama dengan
+sumber resmi. Config `official-research.yaml` menyediakan seleksi enam bulan awal
+serta evaluasi periode sesudahnya dengan fee/slippage. Data tersimpan tidak otomatis
+melatih ML, mengganti strategi, atau membuka gate live.
+
 ## Kontrol lewat Telegram
 
 **Semua pair USDT** dan **Semua pair Spot** membuka katalog berhalaman, bukan daftar

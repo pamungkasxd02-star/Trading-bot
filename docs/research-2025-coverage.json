@@ -1,0 +1,84 @@
+{
+  "source": "https://api.binance.com/api",
+  "requested_start": "2025-01-01T00:00:00+00:00",
+  "requested_end": "2026-01-01T00:00:00+00:00",
+  "interval": "1h",
+  "fetched_at": "2026-09-24T15:02:16.472264+00:00",
+  "symbols": {
+    "BTCUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "dbede4a2f8e32a93eec440951749a36e1fc8a8a99029f2cbdc615c10f5aa6536"
+    },
+    "SOLUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "1a988ee5c6a3ac14bd52f6f2ea07f4c34152409e6a77916e9c5e9c59d4907eea"
+    },
+    "BNBUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "878c7aaff07e5327638b03c94ead523dfc1a8ea3564a36f42ead70b52afeef9b"
+    },
+    "ETHUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "7badfa0d4fa9cf0fe5f3ce635234f2d90179235ee0207ed9a466755ecc3540b9"
+    },
+    "XRPUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "edc4244168ce87008f6de16b9acf7815a1d02fdc3ba246a3ebadfd9273475051"
+    },
+    "ADAUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "0637cda45b6fa281475638897f86b0fac8d8aeb82278988f52f071305706271a"
+    },
+    "AVAXUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "0e82e0b3fa7992eb1639b3d41c35dc52126e0b99124a039e289873f4bf2d5ab2"
+    },
+    "LINKUSDT": {
+      "rows": 8760,
+      "expected_rows": 8760,
+      "complete": true,
+      "gaps": 0,
+      "start": "2025-01-01T00:00:00+00:00",
+      "end": "2025-12-31T23:59:59.999000+00:00",
+      "sha256": "ec711873975bd8e47d993be8072b6c4bb40b084bda67c521ee0f933a9069babd"
+    }
+  },
+  "execution_connected": false,
+  "historical_filter_snapshot": false,
+  "warning": "Coverage bukan bukti profit/ML. Universe saat ini memiliki survivorship bias."
+}

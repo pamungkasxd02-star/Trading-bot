@@ -1,0 +1,26 @@
+# Official REST history research only; not a paper/live execution preset.
+exchange:
+  symbol: BTCUSDT
+  interval: 1h
+  testnet: true
+data:
+  database: data/official-testnet.db
+  research_database: data/official-research.db
+  history_months: 12
+universe:
+  mode: explicit
+  symbols: [BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, LINKUSDT]
+  max_symbols: null
+  min_history_days: 180
+backtest:
+  initial_cash: 1000
+  fee_bps: 10
+  slippage_bps: 5
+research:
+  report_directory: reports/official-research/adaptive
+  train_months: 6
+  test_months: 1
+  min_train_trades: 10
+  min_oos_trades: 20
+  min_folds: 3
+  candidate_set: baseline
