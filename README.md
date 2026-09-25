@@ -30,6 +30,13 @@ order virtual dan tidak otomatis melatih AI.
 Lihat hasil: `.venv/bin/python -m spotlab --config config/candle-study.yaml demo-signals`.
 [Panduan belajar candle](docs/CANDLE_STUDY.md) menjelaskan tiap indikator dan batasannya.
 
+## Pengumpulan dataset skala besar
+
+[Pipeline batch](docs/LARGE_DATASETS.md) membuat antrean per coin, timeframe dan
+bulan; ada budget API, cache untuk melanjutkan, lock runner, audit dan penggabungan
+ke database riset baru. Rencana seluruh pair USDT tidak sama dengan seluruh data
+sudah terunduh. Gunakan `research.batch status` untuk melihat progres sebenarnya.
+
 ## Dataset resmi dan pengujian strategi
 
 Untuk memasukkan histori Binance ke dataset riset terpisah, gunakan
