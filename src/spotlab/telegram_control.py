@@ -15,15 +15,15 @@ from spotlab.market_charts import INTERVALS, MarketCharts, normalize_coin, selec
 from spotlab.strategy_review import catalogue as strategy_catalogue
 from spotlab.strategy_review import review
 from spotlab.telegram_diagnostics import position_report, why_report
-from spotlab.telegram_menu import BROWSER_ROWS, DEMO_ROWS, GUIDE, MAIN_ROWS, keyboard, route
-
-HELP = (
-    "/status /health /coins [query] [page] /eligible [page] /signals [COIN] /settings\n"
-    "/watch ALL or BTCUSDT ETHUSDT (pictures only)\n"
-    "/tradecoins ALL or BTCUSDT ETHUSDT (demo entries)\n"
-    "/chart BTC 15m | /intervals | /analyze BTC 1m 5m 15m\n"
-    "/auto on | off\n/alerts on | off\n/mode setups | observe\n"
-    "Demo only; filters/SL/TP/risk limits always apply."
+from spotlab.telegram_menu import (
+    BROWSER_ROWS,
+    GUIDE,
+    PANELS,
+    SECTIONS,
+    health_label,
+    keyboard,
+    metric,
+    route,
 )
 
 
@@ -100,8 +100,7 @@ class TelegramControl:
             command, args = parts[0].lower(), parts[1:]
             if command == "/_prompt":
                 pass
-            elif command in {"/start", "/menu", "/guide", "/demo"}:
-                markup = keyboard(DEMO_ROWS if command == "/demo" else MAIN_ROWS)
+            elif command in {"/start", "/menu", "/guide", "/help", *SECTIONS, *PANELS}:
                 reply = (command, args)
             elif command in {"/alerts", "/mode"}:
                 choices = {
@@ -113,7 +112,16 @@ class TelegramControl:
                 else:
                     key = "alerts" if command == "/alerts" else "setups_only"
                     control[key] = choices[command][args[0]]
-                    reply = f"{key}={control[key]} (hanya notifikasi, bukan trading)"
+                    label = (
+                        ("Gambar otomatis ON" if control[key] else "Gambar otomatis OFF")
+                        if key == "alerts"
+                        else (
+                            "Gambar hanya saat setup" if control[key] else "Gambar semua pengamatan"
+                        )
+                    )
+                    reply = (
+                        label + ". Hanya mengubah notifikasi; auto-buy tetap seperti sebelumnya."
+                    )
             elif command == "/auto":
                 if args == ["off"]:
                     control["auto"] = False
@@ -151,7 +159,9 @@ class TelegramControl:
                     control[key] = symbols
                     if key == "tradecoins":
                         state["pending"] = {}
-                    reply = f"{key}: {', '.join(symbols) if symbols else 'ALL eligible'}"
+                    label = "Coin gambar" if key == "watch" else "Coin entry demo baru"
+                    reply = f"{label}: {', '.join(symbols) if symbols else 'semua eligible'}. "
+                    reply += "Ini tidak membuat order atau menutup posisi yang ada."
             elif command in {
                 "/status",
                 "/health",
@@ -173,7 +183,7 @@ class TelegramControl:
             }:
                 reply = (command, args)
             else:
-                reply = HELP
+                reply = "Perintah belum dikenali. Kirim /menu atau pilih Panduan dan bantuan."
         # Network/chart work happens after releasing the account transaction.
         if isinstance(reply, tuple):
             command, args = reply
@@ -236,7 +246,9 @@ class TelegramControl:
             return why_report(account)
         if command == "/position":
             return position_report(account)
-        if command == "/guide":
+        if command in PANELS:
+            return PANELS[command]
+        if command in {"/guide", "/help"}:
             return GUIDE
         if command in {"/start", "/menu", "/demo"}:
             status = account.status()
@@ -246,7 +258,7 @@ class TelegramControl:
             mode = "BELAJAR CANDLE (tanpa order)" if study else "DEMO (saldo virtual)"
             intro = (
                 f"Selamat datang! Mode: {mode}\n"
-                f"Health: {status['health']} | "
+                f"Kondisi: {health_label(status['health'])} | "
                 f"Auto entry diizinkan: {'YA' if active else 'TIDAK'}\n"
                 "Live tidak diaktifkan oleh menu ini.\n\n"
             )
@@ -259,32 +271,44 @@ class TelegramControl:
             return intro + (
                 "Mulai dari Lihat candle, lalu ketik BTC 15m.\n"
                 "Analisis coin membandingkan tren beberapa timeframe.\n"
-                "Status akun menunjukkan hasil akun virtual. Atur demo untuk kontrol entry.\n"
-                "Tekan Cara pakai untuk panduan; /menu menampilkan tombol kembali."
+                "Pasar dan coin untuk katalog; Strategi dan analisis untuk penilaian.\n"
+                "Akun demo mengatur entry virtual. Notifikasi hanya mengatur pesan.\n"
+                "Panduan dan bantuan menjelaskan cara pakai; /menu mengembalikan menu utama."
             )
         if command in {"/status", "/health"}:
             s = account.status()
             auto = not account.config.demo.analysis_only and s.get("telegram_control", {}).get(
                 "auto", True
             )
+            mode = "BELAJAR (tanpa order)" if account.config.demo.analysis_only else "DEMO VIRTUAL"
             return (
-                f"DEMO | health={s['health']} | auto entry={auto}\n"
-                f"Equity virtual={s['equity']:.4f} | closed trades={s['trade_count']}\n"
-                f"WR={s['win_rate_pct']} | PF={s['profit_factor']} | expectancy={s['expectancy']}\n"
-                f"Trading halted={s['trading_halted']}\n"
-                f"Posisi={s['position']['symbol'] if s['position'] else 'none'}\n"
-                "Tidak dihitung sebagai paper Testnet. Live tetap terkunci."
+                f"{mode} | Kondisi: {health_label(s['health'])}\n"
+                f"Auto entry: {'ON' if auto else 'OFF'} | "
+                f"Risk halt: {'YA' if s['trading_halted'] else 'TIDAK'}\n"
+                f"Equity virtual: {s['equity']:.4f} USDT | Trade selesai: {s['trade_count']}\n"
+                f"WR: {metric(s['win_rate_pct'], '%')} | PF: {metric(s['profit_factor'])}\n"
+                f"Expectancy: {metric(s['expectancy'])} USDT/trade\n"
+                f"Posisi: {s['position']['symbol'] if s['position'] else 'belum ada'}\n"
+                "ON bukan jaminan entry: data, sinyal dan risk tetap diperiksa.\n"
+                "N/A = belum dapat dihitung. Pilih Kenapa belum buy? di Akun demo.\n"
+                "Akun virtual ini tidak dihitung sebagai paper Testnet; live punya gate terpisah."
             )
         if command == "/settings":
             control = account.status().get("telegram_control", {})
+            cfg = account.config.candle_alerts
+            watch = control.get("watch", cfg.symbols)
+            trade = control.get("tradecoins", [])
+            mode = control.get("setups_only", cfg.setups_only)
+            alerts = cfg.enabled and control.get("alerts", True)
             return (
-                "Watch: "
-                f"{control.get('watch', account.config.candle_alerts.symbols) or 'ALL eligible'}\n"
-                f"Trade coins: {control.get('tradecoins', []) or 'ALL eligible'}\n"
-                f"Alerts: {control.get('alerts', True)} | setups only: "
-                f"{control.get('setups_only', account.config.candle_alerts.setups_only)}\n"
-                f"Global interval: {account.config.candle_alerts.min_interval_seconds}s | "
-                f"coin cooldown: {account.config.candle_alerts.symbol_cooldown_seconds}s"
+                "PENGATURAN AKUN INI\n"
+                f"Coin gambar: {', '.join(watch) if watch else 'semua eligible'}\n"
+                f"Coin entry demo: {', '.join(trade) if trade else 'semua eligible'}\n"
+                f"Gambar otomatis: {'ON' if alerts else 'OFF'}\n"
+                f"Mode gambar: {'hanya setup' if mode else 'semua pengamatan'}\n"
+                f"Jeda minimal semua gambar: {cfg.min_interval_seconds} detik\n"
+                f"Jeda per coin: {cfg.symbol_cooldown_seconds} detik\n"
+                "Notifikasi tidak mengubah coin trading. Lihat Status akun untuk auto entry."
             )
         if command == "/analyze":
             if not args:
@@ -326,7 +350,14 @@ class TelegramControl:
                 rows = [r for r in rows if r["symbol"] == symbol]
             return (
                 "\n".join(
-                    f"{r['symbol']}: {r['assessment']}, score={r['signal_score']:.1f}" for r in rows
+                    f"{r['symbol']}: "
+                    + {
+                        "stale": "data kedaluwarsa",
+                        "wait": "menunggu",
+                        "setup_detected": "setup terdeteksi (belum order)",
+                    }.get(r["assessment"], r["assessment"])
+                    + f", skor aturan={r['signal_score']:.1f}"
+                    for r in rows
                 )
                 or "Belum ada sinyal."
             )

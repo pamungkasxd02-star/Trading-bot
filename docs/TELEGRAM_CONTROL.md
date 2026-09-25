@@ -1,5 +1,8 @@
 # Kontrol demo dari Telegram
 
+Mulai dari [panduan pemula dan peta menu terbaru](TELEGRAM_QUICKSTART.md).
+Tombol dikelompokkan per bagian; command di bawah tetap berlaku.
+
 Fitur ini mengendalikan akun **demo internal** yang sedang berjalan. Tidak mempunyai
 perintah order Binance asli, tidak mengubah API key, dan tidak membuka gate live.
 
@@ -48,7 +51,7 @@ baru membatalkan permintaan input sebelumnya. Jika salah input, pilih tombol lag
 Saat memilih timeframe, **Kembali** mengganti coin; **Batal** membuka menu utama.
 Interval tidak valid tetap berada di langkah pemilihan agar bisa diperbaiki. Deadline
 lima menit dihitung dari mulai alur, tidak diperpanjang oleh input berulang.
-Sesudah grafik terkirim, menu utama ditampilkan kembali.
+Sesudah grafik terkirim, keyboard bagian aktif ditampilkan kembali.
 Setelah restart bot, gunakan `/menu` untuk memulai kembali dengan jelas.
 
 `/start` tidak menyalakan atau mematikan auto-buy. Tombol **Aktifkan auto-buy demo**

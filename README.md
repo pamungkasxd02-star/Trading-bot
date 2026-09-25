@@ -48,6 +48,11 @@ melatih ML, mengganti strategi, atau membuka gate live.
 
 ## Kontrol lewat Telegram
 
+Mulai dengan `/start`: menu sekarang dibagi menjadi **Pasar dan coin**, **Strategi
+dan analisis**, **Akun demo**, **Notifikasi**, serta **Panduan dan bantuan**.
+[Panduan pemula dan peta tombol](docs/TELEGRAM_QUICKSTART.md) menjelaskan langkah
+pemakaian dan tombol yang mengubah pengaturan entry virtual.
+
 **Semua pair USDT** dan **Semua pair Spot** membuka katalog berhalaman, bukan daftar
 coin tetap. **Detail coin** (`/coin SOL`) menunjukkan pasangan serta alasan filter
 scanner. **Cakupan pasar** (`/coverage`) membedakan pair yang tersedia untuk chart

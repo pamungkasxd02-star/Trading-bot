@@ -739,3 +739,25 @@ def test_market_navigation_private_chat_and_scoped_state(demo):
     bot.process(command_update("Halaman sebelumnya", uid=4, owner=98765))
     assert account.status()["telegram_control"]["market_browser"]["page"] == 2
     assert account.status()["telegram_control"]["auto"] is False
+
+
+def test_section_panels_are_owner_only_and_status_is_readable(demo):
+    from spotlab.telegram_control import TelegramControl
+    from spotlab.telegram_menu import PANELS
+
+    account, _ = demo
+    sender = ControlCapture()
+    bot = TelegramControl(account, sender)
+    bot.process(command_update("/auto off"))
+    for uid, command in enumerate(PANELS, start=2):
+        bot.process(command_update(command, uid=uid))
+        assert sender.sent[-1] == PANELS[command]
+        assert sender.markup is not None
+    before = len(sender.sent)
+    bot.process(command_update("Akun demo", uid=20, owner=98765))
+    assert len(sender.sent) == before
+    bot.process(command_update("/status", uid=21))
+    assert "N/A" in sender.sent[-1] and "None" not in sender.sent[-1]
+    bot.process(command_update("/settings", uid=22))
+    assert "Coin gambar:" in sender.sent[-1] and "Coin entry demo:" in sender.sent[-1]
+    assert account.status()["telegram_control"]["auto"] is False

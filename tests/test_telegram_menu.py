@@ -73,3 +73,30 @@ def test_wizard_cancel_and_direct_commands_do_not_become_coin_names():
     route("Analisis coin", state, 103)
     assert route("/auto off", state, 104)[0] == "/auto off"
     assert "menu_prompt" not in state
+
+
+def test_all_section_buttons_have_routes_and_results_return_to_section():
+    from spotlab.telegram_menu import BUTTONS, PROMPTS, SECTIONS
+
+    for rows in SECTIONS.values():
+        assert all(button in BUTTONS or button in PROMPTS for row in rows for button in row)
+    state = {"auto": False}
+    assert route("Strategi dan analisis", state, 100)[0] == "/analysismenu"
+    route("Analisis coin", state, 101)
+    route("SOL", state, 102)
+    command, _, markup = route("Scalping", state, 103)
+    assert command == "/analyze SOL 1m 5m 15m"
+    assert markup["keyboard"] == SECTIONS["/analysismenu"]
+    assert state["auto"] is False
+    route("Menu utama", state, 104)
+    assert state["menu_section"] == "/menu"
+
+
+def test_help_navigation_cancels_wizard_without_mutation():
+    state = {"auto": False}
+    route("Lihat candle", state, 100)
+    route("Panduan dan bantuan", state, 101)
+    assert "menu_prompt" not in state
+    assert state["menu_section"] == "/helpmenu"
+    assert route("Arti istilah", state, 102)[0] == "/glossary"
+    assert state["auto"] is False
